@@ -12,5 +12,29 @@
     "plugin:import/electron",
     "plugin:import/typescript"
   ],
-  "parser": "@typescript-eslint/parser"
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": true,
+      "node": true
+    },
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".tsx", ".mts"]
+    }
+  },
+  "overrides": [
+    {
+      "files": ["vite.*.config.mts"],
+      "rules": {
+        "import/namespace": "off",
+        "import/default": "off",
+        "import/no-named-as-default": "off",
+        "import/no-named-as-default-member": "off"
+      }
+    }
+  ]
 }
