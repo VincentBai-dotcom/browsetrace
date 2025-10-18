@@ -28,6 +28,23 @@ func NewServer(db *database.Database, address string) *Server {
 	}
 }
 
+func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Allow requests from Electron app (localhost with any port)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		// Handle preflight requests
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	w.Write([]byte("ok"))
 }
@@ -117,8 +134,8 @@ func (s *Server) handleGetEvents(w http.ResponseWriter, req *http.Request) {
 
 func (s *Server) setupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", s.handleHealthz)
-	mux.HandleFunc("/events", s.handleEvents)
+	mux.HandleFunc("/healthz", s.corsMiddleware(s.handleHealthz))
+	mux.HandleFunc("/events", s.corsMiddleware(s.handleEvents))
 	return mux
 }
 
