@@ -109,7 +109,8 @@ func TestHandleEventsMethodNotAllowed(t *testing.T) {
 	server, cleanup := setupTestServer(t)
 	defer cleanup()
 
-	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	// PUT is not allowed
+	req := httptest.NewRequest(http.MethodPut, "/events", nil)
 	w := httptest.NewRecorder()
 
 	server.handleEvents(w, req)
@@ -248,12 +249,21 @@ func TestSetupRoutes(t *testing.T) {
 		status int
 	}{
 		{"/healthz", http.MethodGet, http.StatusOK},
-		{"/events", http.MethodGet, http.StatusMethodNotAllowed}, // Only POST allowed
+		{"/events", http.MethodGet, http.StatusOK}, // Now GET is allowed
+		{"/events", http.MethodPost, http.StatusNoContent},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+		t.Run(tt.path+"_"+tt.method, func(t *testing.T) {
+			var req *http.Request
+			if tt.method == http.MethodPost {
+				// Empty batch for POST
+				batch := models.Batch{Events: []models.Event{}}
+				jsonData, _ := json.Marshal(batch)
+				req = httptest.NewRequest(tt.method, tt.path, bytes.NewReader(jsonData))
+			} else {
+				req = httptest.NewRequest(tt.method, tt.path, nil)
+			}
 			w := httptest.NewRecorder()
 
 			mux.ServeHTTP(w, req)
@@ -294,5 +304,365 @@ func TestHandleEventsContentType(t *testing.T) {
 	// Should still work without Content-Type
 	if resp.StatusCode != http.StatusNoContent {
 		t.Errorf("Expected status 204, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleGetEventsEmpty(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	w := httptest.NewRecorder()
+
+	server.handleEvents(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 0 {
+		t.Errorf("Expected 0 events, got %d", len(batch.Events))
+	}
+}
+
+func TestHandleGetEventsWithData(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Insert test events
+	title := "Test Page"
+	insertBatch := models.Batch{
+		Events: []models.Event{
+			{
+				TSUTC: 1000000000000,
+				TSISO: "2001-09-09T01:46:40Z",
+				URL:   "https://example.com",
+				Title: &title,
+				Type:  "navigate",
+				Data:  map[string]any{"foo": "bar"},
+			},
+			{
+				TSUTC: 2000000000000,
+				TSISO: "2033-05-18T03:33:20Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{"x": 100},
+			},
+		},
+	}
+
+	jsonData, _ := json.Marshal(insertBatch)
+	postReq := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(jsonData))
+	postW := httptest.NewRecorder()
+	server.handleEvents(postW, postReq)
+
+	// Now GET the events
+	getReq := httptest.NewRequest(http.MethodGet, "/events", nil)
+	getW := httptest.NewRecorder()
+	server.handleEvents(getW, getReq)
+
+	resp := getW.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 2 {
+		t.Errorf("Expected 2 events, got %d", len(batch.Events))
+	}
+
+	// Verify events are in descending order
+	if batch.Events[0].TSUTC < batch.Events[1].TSUTC {
+		t.Error("Events should be in descending order")
+	}
+}
+
+func TestHandleGetEventsByType(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Insert events of different types
+	insertBatch := models.Batch{
+		Events: []models.Event{
+			{
+				TSUTC: 1000000000000,
+				TSISO: "2001-09-09T01:46:40Z",
+				URL:   "https://example.com",
+				Type:  "navigate",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 2000000000000,
+				TSISO: "2033-05-18T03:33:20Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 3000000000000,
+				TSISO: "2065-01-24T05:20:00Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+		},
+	}
+
+	jsonData, _ := json.Marshal(insertBatch)
+	postReq := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(jsonData))
+	postW := httptest.NewRecorder()
+	server.handleEvents(postW, postReq)
+
+	// Get only click events
+	getReq := httptest.NewRequest(http.MethodGet, "/events?type=click", nil)
+	getW := httptest.NewRecorder()
+	server.handleEvents(getW, getReq)
+
+	resp := getW.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 2 {
+		t.Errorf("Expected 2 click events, got %d", len(batch.Events))
+	}
+
+	for _, event := range batch.Events {
+		if event.Type != "click" {
+			t.Errorf("Expected only click events, got %s", event.Type)
+		}
+	}
+}
+
+func TestHandleGetEventsBySince(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Insert events at different times
+	insertBatch := models.Batch{
+		Events: []models.Event{
+			{
+				TSUTC: 1000000000000,
+				TSISO: "2001-09-09T01:46:40Z",
+				URL:   "https://example.com",
+				Type:  "navigate",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 2000000000000,
+				TSISO: "2033-05-18T03:33:20Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 3000000000000,
+				TSISO: "2065-01-24T05:20:00Z",
+				URL:   "https://example.com",
+				Type:  "scroll",
+				Data:  map[string]any{},
+			},
+		},
+	}
+
+	jsonData, _ := json.Marshal(insertBatch)
+	postReq := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(jsonData))
+	postW := httptest.NewRecorder()
+	server.handleEvents(postW, postReq)
+
+	// Get events after 1500000000000
+	getReq := httptest.NewRequest(http.MethodGet, "/events?since=1500000000000", nil)
+	getW := httptest.NewRecorder()
+	server.handleEvents(getW, getReq)
+
+	resp := getW.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 2 {
+		t.Errorf("Expected 2 events after timestamp, got %d", len(batch.Events))
+	}
+
+	for _, event := range batch.Events {
+		if event.TSUTC < 1500000000000 {
+			t.Errorf("Event timestamp %d is before since 1500000000000", event.TSUTC)
+		}
+	}
+}
+
+func TestHandleGetEventsWithLimit(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Insert 5 events
+	events := []models.Event{}
+	for i := 0; i < 5; i++ {
+		events = append(events, models.Event{
+			TSUTC: int64(1000000000000 + i*1000),
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		})
+	}
+	insertBatch := models.Batch{Events: events}
+
+	jsonData, _ := json.Marshal(insertBatch)
+	postReq := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(jsonData))
+	postW := httptest.NewRecorder()
+	server.handleEvents(postW, postReq)
+
+	// Get only 3 events
+	getReq := httptest.NewRequest(http.MethodGet, "/events?limit=3", nil)
+	getW := httptest.NewRecorder()
+	server.handleEvents(getW, getReq)
+
+	resp := getW.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 3 {
+		t.Errorf("Expected 3 events with limit, got %d", len(batch.Events))
+	}
+}
+
+func TestHandleGetEventsInvalidSince(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest(http.MethodGet, "/events?since=invalid", nil)
+	w := httptest.NewRecorder()
+	server.handleEvents(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid since, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleGetEventsInvalidLimit(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest(http.MethodGet, "/events?limit=invalid", nil)
+	w := httptest.NewRecorder()
+	server.handleEvents(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid limit, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleGetEventsNegativeLimit(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest(http.MethodGet, "/events?limit=-1", nil)
+	w := httptest.NewRecorder()
+	server.handleEvents(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for negative limit, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleGetEventsCombinedFilters(t *testing.T) {
+	server, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	// Insert various events
+	insertBatch := models.Batch{
+		Events: []models.Event{
+			{
+				TSUTC: 1000000000000,
+				TSISO: "2001-09-09T01:46:40Z",
+				URL:   "https://example.com",
+				Type:  "navigate",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 2000000000000,
+				TSISO: "2033-05-18T03:33:20Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 2500000000000,
+				TSISO: "2049-03-11T17:06:40Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+			{
+				TSUTC: 3000000000000,
+				TSISO: "2065-01-24T05:20:00Z",
+				URL:   "https://example.com",
+				Type:  "click",
+				Data:  map[string]any{},
+			},
+		},
+	}
+
+	jsonData, _ := json.Marshal(insertBatch)
+	postReq := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(jsonData))
+	postW := httptest.NewRecorder()
+	server.handleEvents(postW, postReq)
+
+	// Get click events after 1500000000000 with limit 2
+	getReq := httptest.NewRequest(http.MethodGet, "/events?type=click&since=1500000000000&limit=2", nil)
+	getW := httptest.NewRecorder()
+	server.handleEvents(getW, getReq)
+
+	resp := getW.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	var batch models.Batch
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(batch.Events) != 2 {
+		t.Errorf("Expected 2 events with combined filters, got %d", len(batch.Events))
+	}
+
+	for _, event := range batch.Events {
+		if event.Type != "click" {
+			t.Errorf("Expected only click events, got %s", event.Type)
+		}
+		if event.TSUTC < 1500000000000 {
+			t.Errorf("Event timestamp %d is before since 1500000000000", event.TSUTC)
+		}
 	}
 }

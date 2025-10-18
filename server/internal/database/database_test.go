@@ -288,3 +288,350 @@ func TestDatabaseClose(t *testing.T) {
 		t.Errorf("Failed to close database: %v", err)
 	}
 }
+
+func TestGetEventsNoFilter(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert test events
+	title1 := "Page 1"
+	title2 := "Page 2"
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000,
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com/1",
+			Title: &title1,
+			Type:  "navigate",
+			Data:  map[string]any{"foo": "bar"},
+		},
+		{
+			TSUTC: 2000000000000,
+			TSISO: "2033-05-18T03:33:20Z",
+			URL:   "https://example.com/2",
+			Title: &title2,
+			Type:  "click",
+			Data:  map[string]any{"x": 100},
+		},
+		{
+			TSUTC: 3000000000000,
+			TSISO: "2065-01-24T05:20:00Z",
+			URL:   "https://example.com/3",
+			Title: nil,
+			Type:  "scroll",
+			Data:  map[string]any{"position": 500},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get all events
+	filter := EventFilter{Limit: 100}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("Expected 3 events, got %d", len(results))
+	}
+
+	// Should be in descending order (newest first)
+	if len(results) >= 2 && results[0].TSUTC < results[1].TSUTC {
+		t.Error("Events are not in descending order by timestamp")
+	}
+}
+
+func TestGetEventsByType(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert events of different types
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000,
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 2000000000000,
+			TSISO: "2033-05-18T03:33:20Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 3000000000000,
+			TSISO: "2065-01-24T05:20:00Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get only click events
+	clickType := "click"
+	filter := EventFilter{
+		EventType: &clickType,
+		Limit:     100,
+	}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 click events, got %d", len(results))
+	}
+
+	for _, event := range results {
+		if event.Type != "click" {
+			t.Errorf("Expected only click events, got %s", event.Type)
+		}
+	}
+}
+
+func TestGetEventsByTimeRange(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert events at different times
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000, // ~2001
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 2000000000000, // ~2033
+			TSISO: "2033-05-18T03:33:20Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 3000000000000, // ~2065
+			TSISO: "2065-01-24T05:20:00Z",
+			URL:   "https://example.com",
+			Type:  "scroll",
+			Data:  map[string]any{},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get events after timestamp 1500000000000
+	since := int64(1500000000000)
+	filter := EventFilter{
+		SinceUTC: &since,
+		Limit:    100,
+	}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 events after timestamp, got %d", len(results))
+	}
+
+	for _, event := range results {
+		if event.TSUTC < since {
+			t.Errorf("Event timestamp %d is before since %d", event.TSUTC, since)
+		}
+	}
+}
+
+func TestGetEventsLast24Hours(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	now := int64(1729180800000) // Example: Oct 17, 2024
+	yesterday := now - 86400000  // 24 hours ago
+	twoDaysAgo := now - 172800000
+
+	// Insert events from different time periods
+	events := []models.Event{
+		{
+			TSUTC: twoDaysAgo,
+			TSISO: "2024-10-15T12:00:00Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: yesterday + 3600000, // 23 hours ago
+			TSISO: "2024-10-16T13:00:00Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: now - 1000, // Just now
+			TSISO: "2024-10-17T12:00:00Z",
+			URL:   "https://example.com",
+			Type:  "scroll",
+			Data:  map[string]any{},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get events from last 24 hours
+	filter := EventFilter{
+		SinceUTC: &yesterday,
+		Limit:    100,
+	}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 events in last 24 hours, got %d", len(results))
+	}
+}
+
+func TestGetEventsWithLimit(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert 5 events
+	events := []models.Event{}
+	for i := 0; i < 5; i++ {
+		events = append(events, models.Event{
+			TSUTC: int64(1000000000000 + i*1000),
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		})
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get only 3 events
+	filter := EventFilter{Limit: 3}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Errorf("Expected 3 events with limit, got %d", len(results))
+	}
+}
+
+func TestGetEventsCombinedFilters(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert various events
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000,
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Type:  "navigate",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 2000000000000,
+			TSISO: "2033-05-18T03:33:20Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 2500000000000,
+			TSISO: "2049-03-11T17:06:40Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+		{
+			TSUTC: 3000000000000,
+			TSISO: "2065-01-24T05:20:00Z",
+			URL:   "https://example.com",
+			Type:  "click",
+			Data:  map[string]any{},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Get click events after timestamp 1500000000000 with limit 2
+	clickType := "click"
+	since := int64(1500000000000)
+	filter := EventFilter{
+		EventType: &clickType,
+		SinceUTC:  &since,
+		Limit:     2,
+	}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 events with combined filters, got %d", len(results))
+	}
+
+	for _, event := range results {
+		if event.Type != "click" {
+			t.Errorf("Expected only click events, got %s", event.Type)
+		}
+		if event.TSUTC < since {
+			t.Errorf("Event timestamp %d is before since %d", event.TSUTC, since)
+		}
+	}
+}
+
+func TestGetEventsInvalidType(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	invalidType := "invalid_type"
+	filter := EventFilter{
+		EventType: &invalidType,
+		Limit:     100,
+	}
+	_, err := db.GetEvents(filter)
+	if err == nil {
+		t.Error("Expected error for invalid event type, got nil")
+	}
+}
+
+func TestGetEventsEmptyResult(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Don't insert any events
+	filter := EventFilter{Limit: 100}
+	results, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("GetEvents failed: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Expected 0 events, got %d", len(results))
+	}
+}

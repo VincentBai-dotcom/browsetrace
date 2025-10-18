@@ -113,3 +113,83 @@ func (d *Database) InsertEvents(events []models.Event) error {
 	}
 	return nil
 }
+
+type EventFilter struct {
+	EventType *string
+	SinceUTC  *int64
+	UntilUTC  *int64
+	Limit     int
+}
+
+func (d *Database) GetEvents(filter EventFilter) ([]models.Event, error) {
+	query := "SELECT id, ts_utc, ts_iso, url, title, type, data_json FROM events WHERE 1=1"
+	args := []interface{}{}
+
+	if filter.EventType != nil {
+		if !d.validEventTypes[*filter.EventType] {
+			return nil, fmt.Errorf("invalid event type: %s", *filter.EventType)
+		}
+		query += " AND type = ?"
+		args = append(args, *filter.EventType)
+	}
+
+	if filter.SinceUTC != nil {
+		query += " AND ts_utc >= ?"
+		args = append(args, *filter.SinceUTC)
+	}
+
+	if filter.UntilUTC != nil {
+		query += " AND ts_utc <= ?"
+		args = append(args, *filter.UntilUTC)
+	}
+
+	query += " ORDER BY ts_utc DESC"
+
+	if filter.Limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, filter.Limit)
+	}
+
+	rows, err := d.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query events: %w", err)
+	}
+	defer rows.Close()
+
+	var events []models.Event
+	for rows.Next() {
+		var (
+			id       int64
+			tsUTC    int64
+			tsISO    string
+			url      string
+			title    *string
+			typeName string
+			dataJSON string
+		)
+
+		if err := rows.Scan(&id, &tsUTC, &tsISO, &url, &title, &typeName, &dataJSON); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		var data map[string]any
+		if err := json.Unmarshal([]byte(dataJSON), &data); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event data: %w", err)
+		}
+
+		events = append(events, models.Event{
+			TSUTC: tsUTC,
+			TSISO: tsISO,
+			URL:   url,
+			Title: title,
+			Type:  typeName,
+			Data:  data,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return events, nil
+}

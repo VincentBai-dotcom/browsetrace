@@ -38,8 +38,8 @@ The codebase follows Go project layout conventions with clear separation of conc
 3. **Server layer (`internal/server/server.go`)**:
    - Standard library HTTP server with timeouts (5s read/write)
    - Graceful shutdown via signal handling (SIGINT/SIGTERM)
-   - POST-only `/events` endpoint accepts JSON batches
-   - Returns appropriate HTTP status codes (204, 400, 405, 500)
+   - `/events` endpoint supports both POST (to insert events) and GET (to retrieve events with filters)
+   - Returns appropriate HTTP status codes (200, 204, 400, 405, 500)
 
 4. **Event validation**: Two-layer validation (Go validation in database layer + SQLite CHECK constraints)
 
@@ -108,6 +108,30 @@ curl -X POST http://127.0.0.1:51425/events \
     }]
   }'
 ```
+
+### Get events
+```bash
+# Get all events (default limit: 100)
+curl http://127.0.0.1:51425/events
+
+# Get events of a specific type
+curl "http://127.0.0.1:51425/events?type=click"
+
+# Get events from the last 24 hours
+curl "http://127.0.0.1:51425/events?since=$(($(date +%s)*1000 - 86400000))"
+
+# Get events within a time range
+curl "http://127.0.0.1:51425/events?since=1696704000000&until=1696790400000"
+
+# Combine filters and set custom limit
+curl "http://127.0.0.1:51425/events?type=navigate&since=1696704000000&limit=50"
+```
+
+**Query Parameters:**
+- `type`: Filter by event type (navigate, visible_text, click, input, scroll, focus)
+- `since`: Unix timestamp in milliseconds (inclusive lower bound)
+- `until`: Unix timestamp in milliseconds (inclusive upper bound)
+- `limit`: Maximum number of events to return (default: 100)
 
 ## Database Schema
 
