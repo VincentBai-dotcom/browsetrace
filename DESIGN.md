@@ -38,7 +38,7 @@ BrowseTrace is a Chrome extension that captures comprehensive user browsing beha
           ▼                     ▼
 ┌───────────────────┐   ┌──────────────────────────────────┐
 │  Desktop App      │   │  Python LLM Agent                │
-│  (Tauri)          │   │  • Poll/stream events            │
+│  (Electron)       │   │  • Poll/stream events            │
 │  • UI controls    │   │  • Intent inference              │
 │  • Visualization  │   │  • AI workflows                  │
 │  • Settings       │   │  • Context-aware assistance      │
@@ -90,25 +90,27 @@ browsetrace/
 │   │   └── workflows/
 │   └── pyproject.toml
 │
-├── desktop/                   # Tauri desktop app
-│   ├── src-tauri/            # Rust backend
-│   │   ├── src/
-│   │   │   └── main.rs       # Process management, IPC
-│   │   ├── binaries/         # Platform-specific embedded binaries
-│   │   │   ├── browsetrace-server-x86_64-unknown-linux-gnu
-│   │   │   ├── browsetrace-server-x86_64-apple-darwin
-│   │   │   ├── browsetrace-server-aarch64-apple-darwin
-│   │   │   ├── browsetrace-server-x86_64-pc-windows-msvc.exe
-│   │   │   ├── browsetrace-agent-x86_64-unknown-linux-gnu
-│   │   │   ├── browsetrace-agent-x86_64-apple-darwin
-│   │   │   ├── browsetrace-agent-aarch64-apple-darwin
-│   │   │   └── browsetrace-agent-x86_64-pc-windows-msvc.exe
-│   │   ├── tauri.conf.json
-│   │   └── Cargo.toml
-│   ├── src/                  # Web UI (React/Svelte/Vue)
+├── desktop/                   # Electron desktop app
+│   ├── main/                 # Electron main process
+│   │   ├── index.ts          # App entry point
+│   │   ├── process-manager.ts # Manages Go server & Python agent
+│   │   └── ipc-handlers.ts   # IPC communication handlers
+│   ├── preload/              # Preload scripts
+│   │   └── index.ts          # Context bridge for renderer
+│   ├── renderer/             # Renderer process (React/Vue)
 │   │   ├── components/       # UI components
 │   │   ├── stores/           # State management
 │   │   └── App.tsx
+│   ├── resources/            # Platform-specific embedded binaries
+│   │   ├── browsetrace-server-linux
+│   │   ├── browsetrace-server-darwin
+│   │   ├── browsetrace-server-darwin-arm64
+│   │   ├── browsetrace-server-win.exe
+│   │   ├── browsetrace-agent-linux
+│   │   ├── browsetrace-agent-darwin
+│   │   ├── browsetrace-agent-darwin-arm64
+│   │   └── browsetrace-agent-win.exe
+│   ├── electron-builder.yml  # Build configuration
 │   ├── package.json
 │   └── tsconfig.json
 │
@@ -138,8 +140,8 @@ browsetrace/
 The desktop app serves as the unified distribution package, embedding both the Go server and Python agent:
 
 ```
-Tauri Desktop App
-├── Rust Backend (src-tauri/)
+Electron Desktop App
+├── Main Process (main/)
 │   ├── Process Management
 │   │   ├── Launch Go server on startup
 │   │   ├── Launch Python agent on demand
@@ -147,13 +149,18 @@ Tauri Desktop App
 │   ├── Embedded Binaries (platform-specific)
 │   │   ├── browsetrace-server (Go)
 │   │   └── browsetrace-agent (Python)
-│   └── IPC Commands
-│       ├── start_server()
-│       ├── stop_server()
-│       ├── start_agent()
-│       └── get_server_status()
+│   └── IPC Handlers
+│       ├── startServer()
+│       ├── stopServer()
+│       ├── startAgent()
+│       └── getServerStatus()
 │
-└── Web UI (src/)
+├── Preload Scripts (preload/)
+│   └── Context Bridge API
+│       ├── Expose safe IPC methods to renderer
+│       └── Type-safe communication layer
+│
+└── Renderer Process (renderer/)
     ├── Server Status Dashboard
     ├── Event Visualization
     ├── Agent Controls
@@ -165,25 +172,25 @@ Tauri Desktop App
 
 **Build Matrix**: Each platform requires specific binaries
 
-| Platform | Go Server Binary | Python Agent Binary | Tauri Target |
-|----------|-----------------|---------------------|--------------|
-| Linux x64 | `GOOS=linux GOARCH=amd64` | PyInstaller Linux | `x86_64-unknown-linux-gnu` |
-| macOS Intel | `GOOS=darwin GOARCH=amd64` | PyInstaller macOS | `x86_64-apple-darwin` |
-| macOS Apple Silicon | `GOOS=darwin GOARCH=arm64` | PyInstaller macOS ARM | `aarch64-apple-darwin` |
-| Windows x64 | `GOOS=windows GOARCH=amd64` | PyInstaller Windows | `x86_64-pc-windows-msvc` |
+| Platform | Go Server Binary | Python Agent Binary | Electron Platform |
+|----------|-----------------|---------------------|-------------------|
+| Linux x64 | `GOOS=linux GOARCH=amd64` | PyInstaller Linux | `linux` |
+| macOS Intel | `GOOS=darwin GOARCH=amd64` | PyInstaller macOS | `darwin` |
+| macOS Apple Silicon | `GOOS=darwin GOARCH=arm64` | PyInstaller macOS ARM | `darwin` (arm64) |
+| Windows x64 | `GOOS=windows GOARCH=amd64` | PyInstaller Windows | `win32` |
 
-**Binary Naming Convention**: Tauri automatically selects the correct binary using platform suffixes:
+**Binary Naming Convention**: Electron resolves binaries using platform detection:
 ```
-browsetrace-server-{target}[.exe]
-browsetrace-agent-{target}[.exe]
+browsetrace-server-{platform}[.exe]
+browsetrace-agent-{platform}[.exe]
 ```
 
 **Build Process**:
-1. Build Go server for each platform: `go build -o binaries/browsetrace-server-{target}`
-2. Build Python agent with PyInstaller: `pyinstaller --onefile --name browsetrace-agent-{target}`
-3. Place binaries in `desktop/src-tauri/binaries/`
-4. Tauri bundles only the matching platform binary during app build
-5. Runtime: Tauri's `Command::new_sidecar()` automatically resolves to correct binary
+1. Build Go server for each platform: `go build -o resources/browsetrace-server-{platform}`
+2. Build Python agent with PyInstaller: `pyinstaller --onefile --name browsetrace-agent-{platform}`
+3. Place binaries in `desktop/resources/`
+4. Electron Builder copies platform-specific binaries during packaging
+5. Runtime: Process manager uses `process.platform` and `process.arch` to select correct binary
 
 ### Development Workflow
 
@@ -195,8 +202,8 @@ cd server && go run ./cmd/browsetrace-agent
 # Terminal 2: Run Python agent directly
 cd agent && python agent.py
 
-# Terminal 3: Run Tauri in dev mode (without embedded binaries)
-cd desktop && npm run tauri dev
+# Terminal 3: Run Electron in dev mode (without embedded binaries)
+cd desktop && npm run dev
 ```
 
 **Building Release**:
@@ -204,18 +211,18 @@ cd desktop && npm run tauri dev
 # Build all platform binaries
 ./scripts/build-binaries.sh
 
-# Build Tauri app with embedded binaries
-cd desktop && npm run tauri build
+# Build Electron app with embedded binaries
+cd desktop && npm run build
 ```
 
 ### Distribution Strategy
 
 **End-User Installation**:
-- Single installer per platform (DMG, MSI, AppImage)
+- Single installer per platform (DMG, NSIS/MSI, AppImage/deb)
 - Includes embedded Go server + Python agent
 - No separate installation required
 - System tray icon for background operation
-- Auto-updates via Tauri updater
+- Auto-updates via electron-updater
 
 **Developer Installation**:
 - Clone monorepo
