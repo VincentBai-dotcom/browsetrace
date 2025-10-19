@@ -13,17 +13,26 @@ BrowseTrace consists of four components:
 
 ## Quick Start
 
-### Browser Extension
-```bash
-cd browser-extension
-pnpm install
-pnpm dev          # Development mode with auto-rebuild
-pnpm build        # Production build
+### Development Mode (Recommended)
 
-# Load dist/ as unpacked extension in Chrome
+Start both the Go server and desktop app together:
+
+```bash
+./dev.sh
 ```
 
-### Go Server
+This will:
+- Start the Go HTTP server on `http://127.0.0.1:51425`
+- Start the Electron desktop app
+- Handle graceful shutdown on Ctrl+C
+
+Press `Ctrl+C` to stop all processes.
+
+### Manual Component Startup
+
+If you prefer to run components separately:
+
+**Go Server:**
 ```bash
 cd server
 go run ./cmd/browsetrace-agent
@@ -34,19 +43,28 @@ go run ./cmd/browsetrace-agent
 # GET  /stats  - Aggregated metrics
 ```
 
-### Python Agent
+**Desktop App:**
+```bash
+cd desktop
+pnpm install
+pnpm start
+```
+
+**Browser Extension:**
+```bash
+cd browser-extension
+pnpm install
+pnpm dev          # Development mode with auto-rebuild
+pnpm build        # Production build
+
+# Load dist/ as unpacked extension in Chrome
+```
+
+**Python Agent:**
 ```bash
 cd agent
 pip install -r requirements.txt
 python agent.py
-```
-
-### Desktop App
-```bash
-cd desktop
-npm install
-npm run tauri dev    # Development
-npm run tauri build  # Production build with embedded binaries
 ```
 
 ## Design Principles
