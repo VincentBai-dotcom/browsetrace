@@ -4,6 +4,7 @@ import { EventFilter } from '../components/EventFilter';
 import { EventsTable } from '../components/EventsTable';
 import { getEvents } from '../services/api';
 import type { Event, EventFilter as EventFilterType } from '../types/events';
+import { Activity, Database } from 'lucide-react';
 
 function App() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -36,39 +37,30 @@ function App() {
   }, []);
 
   return (
-    <div style={styles.app}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>BrowserTrace Event Visualizer</h1>
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Activity className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">BrowseTrace</h1>
+              <p className="text-sm text-muted-foreground">Event Visualization & Analytics</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+              <Database className="h-4 w-4" />
+              <span>{events.length} events</span>
+            </div>
+          </div>
+        </div>
       </header>
-      <main style={styles.main}>
+      <main className="container mx-auto px-6 py-6 space-y-6">
         <EventFilter onFilterChange={handleFilterChange} />
         <EventsTable events={events} loading={loading} error={error} />
       </main>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  app: {
-    minHeight: '100vh',
-    backgroundColor: '#f0f2f5',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: '20px 40px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  title: {
-    margin: 0,
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  main: {
-    padding: '20px 40px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-  },
-};
 
 export default App;
