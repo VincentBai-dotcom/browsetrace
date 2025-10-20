@@ -5,9 +5,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "pnpm exec prettier . --write && pnpm eslint . && vite build --watch",
-    "build": "pnpm exec prettier . --write && pnpm eslint . && vite build",
+    "predev": "pnpm run format && pnpm run lint",
+    "dev": "vite build --watch",
+    "prebuild": "pnpm run format && pnpm run lint",
+    "build": "vite build",
     "preview": "vite preview",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

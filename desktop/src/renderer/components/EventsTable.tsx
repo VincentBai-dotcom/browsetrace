@@ -1,13 +1,6 @@
 import type { Event, EventType } from 'src/types/events';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -101,9 +94,7 @@ export function EventsTable({ events, loading, error }: EventsTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          Events ({events.length.toLocaleString()})
-        </CardTitle>
+        <CardTitle>Events ({events.length.toLocaleString()})</CardTitle>
         <CardDescription>
           {events.length === 1 ? '1 result found' : `${events.length} results found`}
         </CardDescription>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EventType, EventFilter as EventFilterType} from 'src/types/events';
+import type { EventType, EventFilter as EventFilterType } from 'src/types/events';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -18,14 +18,7 @@ interface EventFilterProps {
   onFilterChange: (filter: EventFilterType) => void;
 }
 
-const EVENT_TYPES: EventType[] = [
-  'navigate',
-  'visible_text',
-  'click',
-  'input',
-  'scroll',
-  'focus',
-];
+const EVENT_TYPES: EventType[] = ['navigate', 'visible_text', 'click', 'input', 'scroll', 'focus'];
 
 const TIME_PRESETS = [
   { label: 'Last Hour', hours: 1, value: '1h' },
@@ -101,7 +94,10 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
               <Layers className="h-4 w-4 text-muted-foreground" />
               <label className="text-sm font-medium">Event Type</label>
             </div>
-            <Select value={selectedType} onValueChange={(value) => handleTypeChange(value as EventType | 'all')}>
+            <Select
+              value={selectedType}
+              onValueChange={(value) => handleTypeChange(value as EventType | 'all')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
@@ -157,28 +153,19 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
               {selectedType !== 'all' && (
                 <Badge variant="secondary" className="gap-1">
                   Type: {selectedType}
-                  <X
-                    className="h-3 w-3 cursor-pointer"
-                    onClick={() => handleTypeChange('all')}
-                  />
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleTypeChange('all')} />
                 </Badge>
               )}
               {activeTimePreset && (
                 <Badge variant="secondary" className="gap-1">
                   Time: {TIME_PRESETS.find((p) => p.value === activeTimePreset)?.label}
-                  <X
-                    className="h-3 w-3 cursor-pointer"
-                    onClick={() => setActiveTimePreset(null)}
-                  />
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setActiveTimePreset(null)} />
                 </Badge>
               )}
               {limit !== '100' && (
                 <Badge variant="secondary" className="gap-1">
                   Limit: {limit}
-                  <X
-                    className="h-3 w-3 cursor-pointer"
-                    onClick={() => handleLimitChange('100')}
-                  />
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleLimitChange('100')} />
                 </Badge>
               )}
             </div>

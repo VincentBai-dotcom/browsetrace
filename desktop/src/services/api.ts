@@ -19,9 +19,7 @@ export async function getEvents(filter: EventFilter = {}): Promise<EventBatch> {
   }
 
   const queryString = params.toString();
-  const url = queryString
-    ? `${API_BASE_URL}/events?${queryString}`
-    : `${API_BASE_URL}/events`;
+  const url = queryString ? `${API_BASE_URL}/events?${queryString}` : `${API_BASE_URL}/events`;
 
   const response = await fetch(url);
 
