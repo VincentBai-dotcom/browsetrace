@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EventType, EventFilter as EventFilterType } from '../types/events';
+import type { EventType, EventFilter as EventFilterType} from 'src/types/events';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,10 +9,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
-import { Badge } from './ui/badge';
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Filter, X, Clock, Layers } from 'lucide-react';
-import { Separator } from './ui/separator';
+import { Separator } from '@/components/ui/separator';
 
 interface EventFilterProps {
   onFilterChange: (filter: EventFilterType) => void;

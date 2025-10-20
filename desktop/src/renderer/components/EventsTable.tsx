@@ -1,4 +1,4 @@
-import type { Event, EventType } from '../types/events';
+import type { Event, EventType } from 'src/types/events';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import {
   Table,
@@ -8,9 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
-import { Badge } from './ui/badge';
-import { Skeleton } from './ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Navigation,
   MousePointer,

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './index.css';
-import { EventFilter } from '../components/EventFilter';
-import { EventsTable } from '../components/EventsTable';
+import { EventFilter } from './components/EventFilter';
+import { EventsTable } from './components/EventsTable';
 import { getEvents } from '../services/api';
 import type { Event, EventFilter as EventFilterType } from '../types/events';
 import { Activity, Database } from 'lucide-react';
