@@ -24,8 +24,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import React, { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { Fragment, useState } from 'react';
 
 interface EventsTableProps {
   events: Event[];
@@ -126,7 +125,7 @@ export function EventsTable({ events, loading, error }: EventsTableProps) {
                 const timestamp = formatTimestamp(event.ts_utc);
                 const isExpanded = expandedRows.has(index);
                 return (
-                  <React.Fragment key={index}>
+                  <Fragment key={index}>
                     <TableRow
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleRow(index)}
@@ -177,7 +176,7 @@ export function EventsTable({ events, loading, error }: EventsTableProps) {
                         </TableCell>
                       </TableRow>
                     )}
-                  </React.Fragment>
+                  </Fragment>
                 );
               })}
             </TableBody>

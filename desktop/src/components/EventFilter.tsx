@@ -50,7 +50,7 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
   const handleLimitChange = (newLimit: string) => {
     setLimit(newLimit);
     onFilterChange({
-      type: selectedType || undefined,
+      type: selectedType === 'all' ? undefined : selectedType,
       limit: parseInt(newLimit) || 100,
     });
   };
@@ -60,7 +60,7 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
     const since = now - hours * 60 * 60 * 1000;
     setActiveTimePreset(value);
     onFilterChange({
-      type: selectedType || undefined,
+      type: selectedType === 'all' ? undefined : selectedType,
       since,
       limit: parseInt(limit) || 100,
     });
