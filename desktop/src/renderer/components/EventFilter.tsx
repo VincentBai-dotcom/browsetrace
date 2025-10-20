@@ -32,20 +32,32 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
   const [limit, setLimit] = useState<string>('100');
   const [activeTimePreset, setActiveTimePreset] = useState<string | null>(null);
 
+  const buildFilter = (overrides: Partial<EventFilterType> = {}): EventFilterType => {
+    const filter: EventFilterType = {
+      type: selectedType === 'all' ? undefined : selectedType,
+      limit: parseInt(limit) || 100,
+    };
+
+    // Include time range if active
+    if (activeTimePreset) {
+      const preset = TIME_PRESETS.find((p) => p.value === activeTimePreset);
+      if (preset) {
+        const now = Date.now();
+        filter.since = now - preset.hours * 60 * 60 * 1000;
+      }
+    }
+
+    return { ...filter, ...overrides };
+  };
+
   const handleTypeChange = (type: EventType | 'all') => {
     setSelectedType(type);
-    onFilterChange({
-      type: type === 'all' ? undefined : type,
-      limit: parseInt(limit) || 100,
-    });
+    onFilterChange(buildFilter({ type: type === 'all' ? undefined : type }));
   };
 
   const handleLimitChange = (newLimit: string) => {
     setLimit(newLimit);
-    onFilterChange({
-      type: selectedType === 'all' ? undefined : selectedType,
-      limit: parseInt(newLimit) || 100,
-    });
+    onFilterChange(buildFilter({ limit: parseInt(newLimit) || 100 }));
   };
 
   const handleTimePreset = (hours: number, value: string) => {
@@ -153,19 +165,40 @@ export function EventFilter({ onFilterChange }: EventFilterProps) {
               {selectedType !== 'all' && (
                 <Badge variant="secondary" className="gap-1">
                   Type: {selectedType}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleTypeChange('all')} />
+                  <button
+                    type="button"
+                    className="ml-1 rounded-sm hover:bg-muted"
+                    onClick={() => handleTypeChange('all')}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               )}
               {activeTimePreset && (
                 <Badge variant="secondary" className="gap-1">
                   Time: {TIME_PRESETS.find((p) => p.value === activeTimePreset)?.label}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => setActiveTimePreset(null)} />
+                  <button
+                    type="button"
+                    className="ml-1 rounded-sm hover:bg-muted"
+                    onClick={() => {
+                      setActiveTimePreset(null);
+                      onFilterChange(buildFilter({ since: undefined }));
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               )}
               {limit !== '100' && (
                 <Badge variant="secondary" className="gap-1">
                   Limit: {limit}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleLimitChange('100')} />
+                  <button
+                    type="button"
+                    className="ml-1 rounded-sm hover:bg-muted"
+                    onClick={() => handleLimitChange('100')}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               )}
             </div>
