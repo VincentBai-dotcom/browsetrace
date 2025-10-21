@@ -31,6 +31,10 @@ function App() {
     fetchEvents(filter);
   };
 
+  const handleRefresh = () => {
+    fetchEvents(currentFilter);
+  };
+
   // Load events on mount
   useEffect(() => {
     fetchEvents(currentFilter);
@@ -57,7 +61,7 @@ function App() {
       </header>
       <main className="container mx-auto px-6 py-6 space-y-6">
         <EventFilter onFilterChange={handleFilterChange} />
-        <EventsTable events={events} loading={loading} error={error} />
+        <EventsTable events={events} loading={loading} error={error} onRefresh={handleRefresh} />
       </main>
     </div>
   );

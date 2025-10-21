@@ -16,16 +16,19 @@ import {
   FileSearch,
   ChevronDown,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 import { Fragment, useState } from 'react';
+import { Button } from './ui/button';
 
 interface EventsTableProps {
   events: Event[];
   loading: boolean;
   error: string | null;
+  onRefresh: () => void;
 }
 
-export function EventsTable({ events, loading, error }: EventsTableProps) {
+export function EventsTable({ events, loading, error, onRefresh }: EventsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const toggleRow = (index: number) => {
@@ -94,10 +97,18 @@ export function EventsTable({ events, loading, error }: EventsTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Events ({events.length.toLocaleString()})</CardTitle>
-        <CardDescription>
-          {events.length === 1 ? '1 result found' : `${events.length} results found`}
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Events ({events.length.toLocaleString()})</CardTitle>
+            <CardDescription>
+              {events.length === 1 ? '1 result found' : `${events.length} results found`}
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
