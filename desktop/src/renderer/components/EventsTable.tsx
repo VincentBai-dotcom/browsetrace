@@ -73,6 +73,18 @@ export function EventsTable({ events, loading, error, onRefresh }: EventsTablePr
   if (events.length === 0) {
     return (
       <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Events (0)</CardTitle>
+              <CardDescription>No results found</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <FileSearch className="h-16 w-16 text-muted-foreground/50 mb-4" />
           <p className="text-lg font-medium text-muted-foreground">No events found</p>

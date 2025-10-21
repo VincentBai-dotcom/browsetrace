@@ -15,8 +15,15 @@ function App() {
   const fetchEvents = async (filter: EventFilterType) => {
     setLoading(true);
     setError(null);
+    const startTime = Date.now();
     try {
       const result = await getEvents(filter);
+      // Minimum loading time of 200ms for smooth UX
+      const elapsed = Date.now() - startTime;
+      const minimumDelay = 200;
+      if (elapsed < minimumDelay) {
+        await new Promise((resolve) => setTimeout(resolve, minimumDelay - elapsed));
+      }
       setEvents(result.events || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch events');
