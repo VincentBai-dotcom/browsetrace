@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$ROOT_DIR/server"
 DESKTOP_DIR="$ROOT_DIR/desktop"
+EXTENSION_DIR="$ROOT_DIR/browser-extension"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  BrowseTrace Development Environment${NC}"
@@ -62,8 +63,29 @@ if [ ! -d "$DESKTOP_DIR/node_modules" ]; then
     echo ""
 fi
 
+# Check if browser extension dependencies are installed
+if [ ! -d "$EXTENSION_DIR/node_modules" ]; then
+    echo -e "${YELLOW}Installing browser extension dependencies...${NC}"
+    cd "$EXTENSION_DIR"
+    pnpm install
+    echo ""
+fi
+
+# Build browser extension first (wait for completion)
+echo -e "${GREEN}[1/3] Building Browser Extension...${NC}"
+cd "$EXTENSION_DIR"
+pnpm build
+
+# Start browser extension in watch mode (background)
+echo -e "${GREEN}      Starting watch mode for extension...${NC}"
+pnpm dev 2>&1 | sed "s/^/[EXTENSION] /" &
+EXTENSION_PID=$!
+
+# Wait for watch mode to initialize
+sleep 3
+
 # Start Go server in background
-echo -e "${GREEN}[1/2] Starting Go HTTP Server...${NC}"
+echo -e "${GREEN}[2/3] Starting Go HTTP Server...${NC}"
 cd "$SERVER_DIR"
 go run ./cmd/browsetrace-agent 2>&1 | sed "s/^/[SERVER] /" &
 SERVER_PID=$!
@@ -77,7 +99,7 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
     exit 1
 fi
 
-echo -e "${GREEN}[2/2] Starting Electron Desktop App...${NC}"
+echo -e "${GREEN}[3/3] Starting Electron Desktop App...${NC}"
 cd "$DESKTOP_DIR"
 pnpm start 2>&1 | sed "s/^/[DESKTOP] /" &
 DESKTOP_PID=$!
@@ -87,6 +109,7 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  Development Environment Running${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
+echo -e "${BLUE}Extension:${NC}      Building to browser-extension/dist/"
 echo -e "${BLUE}Go Server:${NC}      http://127.0.0.1:51425"
 echo -e "${BLUE}Desktop App:${NC}    Electron window should open"
 echo ""
