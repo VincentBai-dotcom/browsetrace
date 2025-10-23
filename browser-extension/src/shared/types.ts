@@ -12,7 +12,6 @@ export interface ClickEventData {
 export interface InputEventData {
   selector: string;
   value: string;
-  source: "debounce" | "blur"; // Track whether input was captured via debounce or blur
 }
 
 export interface FocusEventData {

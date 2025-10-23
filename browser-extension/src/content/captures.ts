@@ -1,5 +1,4 @@
 import { emit, cssPath, maskInputValue } from "./utils";
-import { INPUT_DEBOUNCE_MS } from "./config";
 
 // navigation + SPA changes
 export function registerNavigation() {
@@ -37,58 +36,18 @@ export function registerClicks() {
   );
 }
 
-// inputs (masked) - hybrid approach with debouncing + blur
+// inputs (masked) - capture on blur
 export function registerInputs() {
-  // Track debounce timers per element
-  const debounceTimers = new WeakMap<Element, number>();
-
-  const captureInput = (
-    target: HTMLInputElement | HTMLTextAreaElement,
-    source: "debounce" | "blur",
-  ) => {
-    const selector = cssPath(target);
-    const value = maskInputValue(target);
-
-    emit("input", { selector, value, source });
-  };
-
-  // Debounced input handler
-  addEventListener(
-    "input",
-    (e) => {
-      const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
-      if (!target) return;
-
-      // Clear existing timer
-      const existingTimer = debounceTimers.get(target);
-      if (existingTimer) clearTimeout(existingTimer);
-
-      // Set new timer
-      const timer = window.setTimeout(() => {
-        captureInput(target, "debounce");
-      }, INPUT_DEBOUNCE_MS);
-
-      debounceTimers.set(target, timer);
-    },
-    { capture: true },
-  );
-
-  // Blur handler for immediate capture when user leaves field
   addEventListener(
     "blur",
     (e) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
       if (!target) return;
 
-      // Clear pending debounce timer
-      const existingTimer = debounceTimers.get(target);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        debounceTimers.delete(target);
-      }
+      const selector = cssPath(target);
+      const value = maskInputValue(target);
 
-      // Capture immediately on blur
-      captureInput(target, "blur");
+      emit("input", { selector, value });
     },
     { capture: true },
   );

@@ -24,8 +24,17 @@ export function emit(type: "visible_text", data: VisibleTextEventData): void;
 // Implementation signature (not exported separately)
 export async function emit(type: EventType, data: unknown): Promise<void> {
   // Check if capture is paused
-  const { paused = false } = await chrome.storage.local.get("paused");
-  if (paused) return;
+  try {
+    const { paused = false } = await chrome.storage.local.get("paused");
+    if (paused) return;
+  } catch (error) {
+    // Extension context invalidated (extension was reloaded) - silently fail
+    console.warn(
+      "Extension context invalidated, cannot check paused state:",
+      error,
+    );
+    return;
+  }
 
   console.log("emit", type, data);
 
@@ -52,6 +61,9 @@ export function cssPath(element: Element): string {
     tempElement && parts.length < 5;
     tempElement = tempElement.parentElement
   ) {
+    // Skip if tagName doesn't exist (shouldn't happen but safety check)
+    if (!tempElement.tagName) continue;
+
     let s = tempElement.tagName.toLowerCase();
     if (tempElement.classList.length) {
       s += "." + [...tempElement.classList].slice(0, 2).join(".");
