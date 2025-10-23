@@ -39,9 +39,8 @@ export function registerClicks() {
 
 // inputs (masked) - hybrid approach with debouncing + blur
 export function registerInputs() {
-  // Track debounce timers and last captured values per element
+  // Track debounce timers per element
   const debounceTimers = new WeakMap<Element, number>();
-  const lastCaptured = new WeakMap<Element, string>();
 
   const captureInput = (
     target: HTMLInputElement | HTMLTextAreaElement,
@@ -50,10 +49,6 @@ export function registerInputs() {
     const selector = cssPath(target);
     const value = maskInputValue(target);
 
-    // Deduplication: only emit if value changed since last capture
-    if (lastCaptured.get(target) === value) return;
-
-    lastCaptured.set(target, value);
     emit("input", { selector, value, source });
   };
 
