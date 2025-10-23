@@ -1,4 +1,4 @@
-export type EventType = 'navigate' | 'visible_text' | 'click' | 'input' | 'scroll' | 'focus';
+export type EventType = 'navigate' | 'visible_text' | 'click' | 'input' | 'focus';
 
 export interface Event {
   ts_utc: number;

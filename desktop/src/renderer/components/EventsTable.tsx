@@ -8,7 +8,6 @@ import {
   Navigation,
   MousePointer,
   Type,
-  Scroll,
   Focus,
   Eye,
   ExternalLink,
@@ -211,7 +210,6 @@ function EventTypeBadge({ type }: { type: EventType }) {
       visible_text: { icon: <Eye className="h-3 w-3" />, variant: 'secondary' },
       click: { icon: <MousePointer className="h-3 w-3" />, variant: 'outline' },
       input: { icon: <Type className="h-3 w-3" />, variant: 'default' },
-      scroll: { icon: <Scroll className="h-3 w-3" />, variant: 'secondary' },
       focus: { icon: <Focus className="h-3 w-3" />, variant: 'outline' },
     };
 

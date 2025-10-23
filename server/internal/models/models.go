@@ -5,7 +5,7 @@ type Event struct {
 	TSISO string         `json:"ts_iso"`
 	URL   string         `json:"url"`
 	Title *string        `json:"title"` // nullable
-	Type  string         `json:"type"`  // navigate|visible_text|click|input|scroll|focus
+	Type  string         `json:"type"`  // navigate|visible_text|click|input|focus
 	Data  map[string]any `json:"data"`  // arbitrary JSON
 }
 

@@ -18,7 +18,7 @@ interface EventFilterProps {
   onFilterChange: (filter: EventFilterType) => void;
 }
 
-const EVENT_TYPES: EventType[] = ['navigate', 'visible_text', 'click', 'input', 'scroll', 'focus'];
+const EVENT_TYPES: EventType[] = ['navigate', 'visible_text', 'click', 'input', 'focus'];
 
 const TIME_PRESETS = [
   { label: 'Last Hour', hours: 1, value: '1h' },

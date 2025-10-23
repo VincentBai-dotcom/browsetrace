@@ -58,7 +58,7 @@ Buffer (batched) → Port Message → Service Worker → Local HTTP Server
 
 ### Key Modules
 
-- **`content/captures.ts`**: Registers all DOM event listeners (navigation, clicks, inputs, scroll, focus, visible text)
+- **`content/captures.ts`**: Registers all DOM event listeners (navigation, clicks, inputs, focus, visible text)
 - **`content/buffer.ts`**: Batches events before sending (configurable size/time in `config.ts`)
 - **`content/port.ts`**: Manages long-lived connection to service worker with auto-reconnect
 - **`content/utils.ts`**:

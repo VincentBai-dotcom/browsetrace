@@ -77,7 +77,7 @@ type Event struct {
 	TSISO string         `json:"ts_iso"`
 	URL   string         `json:"url"`
 	Title *string        `json:"title"` // nullable
-	Type  string         `json:"type"`  // navigate|visible_text|click|input|scroll|focus
+	Type  string         `json:"type"`  // navigate|visible_text|click|input|focus
 	Data  map[string]any `json:"data"`  // arbitrary JSON
 }
 ```
@@ -211,7 +211,7 @@ defer db.Close()
 	  ts_iso    TEXT    NOT NULL,
 	  url       TEXT    NOT NULL,
 	  title     TEXT,
-	  type      TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','scroll','focus')),
+	  type      TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','focus')),
 	  data_json TEXT    NOT NULL CHECK (json_valid(data_json))
 	);
 	CREATE INDEX IF NOT EXISTS idx_events_ts   ON events(ts_utc);
@@ -260,7 +260,6 @@ Indexes speed up queries. These three indexes optimize searches by:
 		"visible_text": true,
 		"click":        true,
 		"input":        true,
-		"scroll":       true,
 		"focus":        true,
 	}
 ```
@@ -859,7 +858,6 @@ Accepts a batch of browser events.
 - `visible_text` - Text became visible
 - `click` - User clicked
 - `input` - User typed input
-- `scroll` - User scrolled
 - `focus` - Element received focus
 
 **Responses**:

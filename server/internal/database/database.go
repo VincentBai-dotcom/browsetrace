@@ -33,7 +33,6 @@ func NewDatabase(databasePath string) (*Database, error) {
 			"visible_text": true,
 			"click":        true,
 			"input":        true,
-			"scroll":       true,
 			"focus":        true,
 		},
 	}, nil
@@ -47,7 +46,7 @@ func createTables(db *sql.DB) error {
 	  ts_iso    TEXT    NOT NULL,
 	  url       TEXT    NOT NULL,
 	  title     TEXT,
-	  type      TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','scroll','focus')),
+	  type      TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','focus')),
 	  data_json TEXT    NOT NULL CHECK (json_valid(data_json))
 	);
 	CREATE INDEX IF NOT EXISTS idx_events_ts   ON events(ts_utc);

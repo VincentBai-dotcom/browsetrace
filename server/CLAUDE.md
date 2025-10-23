@@ -45,7 +45,7 @@ The codebase follows Go project layout conventions with clear separation of conc
 
 ### Event Types
 
-Valid event types are: `navigate`, `visible_text`, `click`, `input`, `scroll`, `focus`
+Valid event types are: `navigate`, `visible_text`, `click`, `input`, `focus`
 
 ## Common Development Commands
 
@@ -128,7 +128,7 @@ curl "http://127.0.0.1:51425/events?type=navigate&since=1696704000000&limit=50"
 ```
 
 **Query Parameters:**
-- `type`: Filter by event type (navigate, visible_text, click, input, scroll, focus)
+- `type`: Filter by event type (navigate, visible_text, click, input, focus)
 - `since`: Unix timestamp in milliseconds (inclusive lower bound)
 - `until`: Unix timestamp in milliseconds (inclusive upper bound)
 - `limit`: Maximum number of events to return (default: 100)

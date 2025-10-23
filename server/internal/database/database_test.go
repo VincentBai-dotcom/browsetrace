@@ -208,7 +208,7 @@ func TestAllEventTypes(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	eventTypes := []string{"navigate", "visible_text", "click", "input", "scroll", "focus"}
+	eventTypes := []string{"navigate", "visible_text", "click", "input", "focus"}
 
 	for _, eventType := range eventTypes {
 		t.Run(eventType, func(t *testing.T) {
@@ -318,8 +318,8 @@ func TestGetEventsNoFilter(t *testing.T) {
 			TSISO: "2065-01-24T05:20:00Z",
 			URL:   "https://example.com/3",
 			Title: nil,
-			Type:  "scroll",
-			Data:  map[string]any{"position": 500},
+			Type:  "focus",
+			Data:  map[string]any{"element": "input"},
 		},
 	}
 
@@ -423,7 +423,7 @@ func TestGetEventsByTimeRange(t *testing.T) {
 			TSUTC: 3000000000000, // ~2065
 			TSISO: "2065-01-24T05:20:00Z",
 			URL:   "https://example.com",
-			Type:  "scroll",
+			Type:  "focus",
 			Data:  map[string]any{},
 		},
 	}
@@ -482,7 +482,7 @@ func TestGetEventsLast24Hours(t *testing.T) {
 			TSUTC: now - 1000, // Just now
 			TSISO: "2024-10-17T12:00:00Z",
 			URL:   "https://example.com",
-			Type:  "scroll",
+			Type:  "focus",
 			Data:  map[string]any{},
 		},
 	}
