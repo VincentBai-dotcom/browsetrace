@@ -32,6 +32,7 @@ export type EventPayload =
       title: string | null;
       type: "navigate";
       data: NavigateEventData;
+      session_id: string;
     }
   | {
       ts_utc: number;
@@ -40,6 +41,7 @@ export type EventPayload =
       title: string | null;
       type: "click";
       data: ClickEventData;
+      session_id: string;
     }
   | {
       ts_utc: number;
@@ -48,6 +50,8 @@ export type EventPayload =
       title: string | null;
       type: "input";
       data: InputEventData;
+      session_id: string;
+      field_id: string;
     }
   | {
       ts_utc: number;
@@ -56,6 +60,7 @@ export type EventPayload =
       title: string | null;
       type: "focus";
       data: FocusEventData;
+      session_id: string;
     }
   | {
       ts_utc: number;
@@ -64,6 +69,7 @@ export type EventPayload =
       title: string | null;
       type: "visible_text";
       data: VisibleTextEventData;
+      session_id: string;
     };
 
 // Extract all valid event types from the discriminated union

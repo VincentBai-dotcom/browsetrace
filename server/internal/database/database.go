@@ -41,17 +41,28 @@ func NewDatabase(databasePath string) (*Database, error) {
 func createTables(db *sql.DB) error {
 	_, err := db.Exec(`
 	CREATE TABLE IF NOT EXISTS events(
-	  id        INTEGER PRIMARY KEY,
-	  ts_utc    INTEGER NOT NULL,
-	  ts_iso    TEXT    NOT NULL,
-	  url       TEXT    NOT NULL,
-	  title     TEXT,
-	  type      TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','focus')),
-	  data_json TEXT    NOT NULL CHECK (json_valid(data_json))
+	  id         INTEGER PRIMARY KEY,
+	  ts_utc     INTEGER NOT NULL,
+	  ts_iso     TEXT    NOT NULL,
+	  url        TEXT    NOT NULL,
+	  title      TEXT,
+	  type       TEXT    NOT NULL CHECK (type IN ('navigate','visible_text','click','input','focus')),
+	  data_json  TEXT    NOT NULL CHECK (json_valid(data_json)),
+	  session_id TEXT,
+	  field_id   TEXT
 	);
 	CREATE INDEX IF NOT EXISTS idx_events_ts   ON events(ts_utc);
 	CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
 	CREATE INDEX IF NOT EXISTS idx_events_url  ON events(url);
+
+	-- Unique index for input event deduplication (NULLs are allowed for non-input events)
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_input_field_session
+	ON events(url, field_id, session_id);
+
+	-- Partial index for faster input event queries
+	CREATE INDEX IF NOT EXISTS idx_input_lookup
+	ON events(session_id, field_id)
+	WHERE type = 'input';
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create database tables: %w", err)
@@ -84,12 +95,31 @@ func (d *Database) InsertEvents(events []models.Event) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	statement, err := transaction.Prepare(`INSERT INTO events(ts_utc, ts_iso, url, title, type, data_json) VALUES(?,?,?,?,?,json(?))`)
+
+	// Prepare statement for regular INSERT (non-input events)
+	insertStmt, err := transaction.Prepare(`INSERT INTO events(ts_utc, ts_iso, url, title, type, data_json, session_id, field_id) VALUES(?,?,?,?,?,json(?),?,?)`)
 	if err != nil {
 		_ = transaction.Rollback()
-		return fmt.Errorf("failed to prepare statement: %w", err)
+		return fmt.Errorf("failed to prepare insert statement: %w", err)
 	}
-	defer statement.Close()
+	defer insertStmt.Close()
+
+	// Prepare statement for UPSERT (input events)
+	upsertStmt, err := transaction.Prepare(`
+		INSERT INTO events(ts_utc, ts_iso, url, title, type, data_json, session_id, field_id)
+		VALUES(?,?,?,?,?,json(?),?,?)
+		ON CONFLICT(url, field_id, session_id)
+		DO UPDATE SET
+			ts_utc = excluded.ts_utc,
+			ts_iso = excluded.ts_iso,
+			title = excluded.title,
+			data_json = excluded.data_json
+	`)
+	if err != nil {
+		_ = transaction.Rollback()
+		return fmt.Errorf("failed to prepare upsert statement: %w", err)
+	}
+	defer upsertStmt.Close()
 
 	for _, event := range events {
 		if err := d.ValidateEvent(event); err != nil {
@@ -102,11 +132,21 @@ func (d *Database) InsertEvents(events []models.Event) error {
 			_ = transaction.Rollback()
 			return fmt.Errorf("failed to marshal event data: %w", err)
 		}
-		if _, err := statement.Exec(event.TSUTC, event.TSISO, event.URL, event.Title, event.Type, string(jsonData)); err != nil {
+
+		// Use UPSERT for input events, regular INSERT for others
+		var stmt *sql.Stmt
+		if event.Type == "input" && event.FieldID != nil && event.SessionID != nil {
+			stmt = upsertStmt
+		} else {
+			stmt = insertStmt
+		}
+
+		if _, err := stmt.Exec(event.TSUTC, event.TSISO, event.URL, event.Title, event.Type, string(jsonData), event.SessionID, event.FieldID); err != nil {
 			_ = transaction.Rollback()
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}
 	}
+
 	if err := transaction.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -121,8 +161,8 @@ type EventFilter struct {
 }
 
 func (d *Database) GetEvents(filter EventFilter) ([]models.Event, error) {
-	query := "SELECT id, ts_utc, ts_iso, url, title, type, data_json FROM events WHERE 1=1"
-	args := []interface{}{}
+	query := "SELECT id, ts_utc, ts_iso, url, title, type, data_json, session_id, field_id FROM events WHERE 1=1"
+	args := []any{}
 
 	if filter.EventType != nil {
 		if !d.validEventTypes[*filter.EventType] {
@@ -158,16 +198,18 @@ func (d *Database) GetEvents(filter EventFilter) ([]models.Event, error) {
 	var events []models.Event
 	for rows.Next() {
 		var (
-			id       int64
-			tsUTC    int64
-			tsISO    string
-			url      string
-			title    *string
-			typeName string
-			dataJSON string
+			id        int64
+			tsUTC     int64
+			tsISO     string
+			url       string
+			title     *string
+			typeName  string
+			dataJSON  string
+			sessionID *string
+			fieldID   *string
 		)
 
-		if err := rows.Scan(&id, &tsUTC, &tsISO, &url, &title, &typeName, &dataJSON); err != nil {
+		if err := rows.Scan(&id, &tsUTC, &tsISO, &url, &title, &typeName, &dataJSON, &sessionID, &fieldID); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
@@ -177,12 +219,14 @@ func (d *Database) GetEvents(filter EventFilter) ([]models.Event, error) {
 		}
 
 		events = append(events, models.Event{
-			TSUTC: tsUTC,
-			TSISO: tsISO,
-			URL:   url,
-			Title: title,
-			Type:  typeName,
-			Data:  data,
+			TSUTC:     tsUTC,
+			TSISO:     tsISO,
+			URL:       url,
+			Title:     title,
+			Type:      typeName,
+			Data:      data,
+			SessionID: sessionID,
+			FieldID:   fieldID,
 		})
 	}
 

@@ -635,3 +635,263 @@ func TestGetEventsEmptyResult(t *testing.T) {
 		t.Errorf("Expected 0 events, got %d", len(results))
 	}
 }
+
+func TestInputEventUpsert(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	fieldID := "#email"
+	url := "https://example.com"
+
+	// Insert first input event
+	events1 := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       url,
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "john"},
+			SessionID: &sessionID,
+			FieldID:   &fieldID,
+		},
+	}
+
+	if err := db.InsertEvents(events1); err != nil {
+		t.Fatalf("Failed to insert first input event: %v", err)
+	}
+
+	// Insert second input event with same url, field_id, session_id (should UPSERT)
+	events2 := []models.Event{
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       url,
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "john@example.com"},
+			SessionID: &sessionID,
+			FieldID:   &fieldID,
+		},
+	}
+
+	if err := db.InsertEvents(events2); err != nil {
+		t.Fatalf("Failed to upsert input event: %v", err)
+	}
+
+	// Verify only one event exists (upserted)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'input'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("Expected 1 input event after upsert, got %d", count)
+	}
+
+	// Verify the value was updated
+	var dataJSON string
+	var tsUTC int64
+	err = db.db.QueryRow("SELECT data_json, ts_utc FROM events WHERE type = 'input'").Scan(&dataJSON, &tsUTC)
+	if err != nil {
+		t.Fatalf("Failed to query event: %v", err)
+	}
+
+	// Should have the newer timestamp and value
+	if tsUTC != 2000000000000 {
+		t.Errorf("Expected timestamp 2000000000000, got %d", tsUTC)
+	}
+
+	// Check if the value was updated
+	if dataJSON == "" {
+		t.Error("Expected non-empty data_json")
+	}
+}
+
+func TestInputEventUpsertDifferentURLs(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	fieldID := "#email"
+
+	// Insert input events with same field_id and session_id but different URLs
+	events := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       "https://example.com/page1",
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "user1@example.com"},
+			SessionID: &sessionID,
+			FieldID:   &fieldID,
+		},
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       "https://example.com/page2",
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "user2@example.com"},
+			SessionID: &sessionID,
+			FieldID:   &fieldID,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert input events: %v", err)
+	}
+
+	// Verify both events exist (different URLs)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'input'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 input events with different URLs, got %d", count)
+	}
+}
+
+func TestInputEventUpsertDifferentSessions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	session1 := "session-1"
+	session2 := "session-2"
+	fieldID := "#email"
+	url := "https://example.com"
+
+	// Insert input events with same URL and field_id but different sessions
+	events := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       url,
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "session1@example.com"},
+			SessionID: &session1,
+			FieldID:   &fieldID,
+		},
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       url,
+			Type:      "input",
+			Data:      map[string]any{"selector": "#email", "value": "session2@example.com"},
+			SessionID: &session2,
+			FieldID:   &fieldID,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert input events: %v", err)
+	}
+
+	// Verify both events exist (different sessions)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'input'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 input events with different sessions, got %d", count)
+	}
+}
+
+func TestNonInputEventsNotAffectedByUpsert(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	url := "https://example.com"
+
+	// Insert multiple click events with same session and URL (should NOT upsert)
+	events := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       url,
+			Type:      "click",
+			Data:      map[string]any{"x": 100, "y": 200},
+			SessionID: &sessionID,
+		},
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       url,
+			Type:      "click",
+			Data:      map[string]any{"x": 150, "y": 250},
+			SessionID: &sessionID,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert click events: %v", err)
+	}
+
+	// Verify both click events exist (no upsert for non-input events)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'click'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 click events (no upsert), got %d", count)
+	}
+}
+
+func TestInputEventUpsertMultipleUpdates(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	fieldID := "#search"
+	url := "https://example.com"
+
+	// Simulate user typing incrementally (like "h", "he", "hel", "hell", "hello")
+	values := []string{"h", "he", "hel", "hell", "hello"}
+
+	for i, value := range values {
+		events := []models.Event{
+			{
+				TSUTC:     int64(1000000000000 + i*1000),
+				TSISO:     "2001-09-09T01:46:40Z",
+				URL:       url,
+				Type:      "input",
+				Data:      map[string]any{"selector": "#search", "value": value},
+				SessionID: &sessionID,
+				FieldID:   &fieldID,
+			},
+		}
+
+		if err := db.InsertEvents(events); err != nil {
+			t.Fatalf("Failed to insert/update input event %d: %v", i, err)
+		}
+	}
+
+	// Verify only one event exists with the final value
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'input'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("Expected 1 input event after multiple upserts, got %d", count)
+	}
+
+	// Verify it has the final timestamp
+	var tsUTC int64
+	err = db.db.QueryRow("SELECT ts_utc FROM events WHERE type = 'input'").Scan(&tsUTC)
+	if err != nil {
+		t.Fatalf("Failed to query timestamp: %v", err)
+	}
+
+	expectedTS := int64(1000000000000 + 4*1000) // Last timestamp
+	if tsUTC != expectedTS {
+		t.Errorf("Expected final timestamp %d, got %d", expectedTS, tsUTC)
+	}
+}

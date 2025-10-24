@@ -1,4 +1,4 @@
-import { emit, cssPath, maskInputValue } from "./utils";
+import { emit, cssPath } from "./utils";
 
 // navigation + SPA changes
 export function registerNavigation() {
@@ -36,18 +36,19 @@ export function registerClicks() {
   );
 }
 
-// inputs (masked)
+// inputs (unmasked)
 export function registerInputs() {
   addEventListener(
     "input",
     (e) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
       if (!target) return;
-
+      console.log(target);
       const selector = cssPath(target);
-      const value = maskInputValue(target);
+      const value = target.value ?? "";
 
-      emit("input", { selector, value });
+      // Pass selector as field_id for deduplication
+      emit("input", { selector, value }, selector);
     },
     { capture: true },
   );
@@ -62,7 +63,7 @@ export function registerFocus() {
       if (!target) return;
       emit("focus", {
         selector: cssPath(target),
-        value: maskInputValue(target),
+        value: target.value ?? "",
       });
     },
     true,

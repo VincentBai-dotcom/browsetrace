@@ -9,6 +9,9 @@ import type {
 } from "../shared/types";
 import { safePush } from "./buffer";
 
+// Generate unique session ID for this content script instance
+const SESSION_ID = crypto.randomUUID();
+
 export function getTimestamps() {
   const date = new Date();
   return { ts_utc: date.getTime(), ts_iso: date.toISOString() };
@@ -17,12 +20,20 @@ export function getTimestamps() {
 // Type-safe emit function with overloads for each event type
 export function emit(type: "navigate", data: NavigateEventData): void;
 export function emit(type: "click", data: ClickEventData): void;
-export function emit(type: "input", data: InputEventData): void;
+export function emit(
+  type: "input",
+  data: InputEventData,
+  fieldId?: string,
+): void;
 export function emit(type: "focus", data: FocusEventData): void;
 export function emit(type: "visible_text", data: VisibleTextEventData): void;
 
 // Implementation signature (not exported separately)
-export async function emit(type: EventType, data: unknown): Promise<void> {
+export async function emit(
+  type: EventType,
+  data: unknown,
+  fieldId?: string,
+): Promise<void> {
   // Check if capture is paused
   try {
     const { paused = false } = await chrome.storage.local.get("paused");
@@ -40,17 +51,25 @@ export async function emit(type: EventType, data: unknown): Promise<void> {
 
   const { ts_utc, ts_iso } = getTimestamps();
 
-  // Type assertion is safe because overloads enforce correctness at call sites
-  const eventPayload = {
+  // Build base event payload
+  const basePayload = {
     ts_utc,
     ts_iso,
     url: location.href,
     title: document.title || null,
     type,
     data,
-  } as EventPayload;
+    session_id: SESSION_ID,
+  };
 
-  safePush(eventPayload);
+  // For input events, add field_id
+  const eventPayload =
+    type === "input" && fieldId
+      ? { ...basePayload, field_id: fieldId }
+      : basePayload;
+
+  // Type assertion is safe because overloads enforce correctness at call sites
+  safePush(eventPayload as EventPayload);
 }
 
 export function cssPath(element: Element): string {
