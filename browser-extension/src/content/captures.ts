@@ -36,10 +36,10 @@ export function registerClicks() {
   );
 }
 
-// inputs (masked) - capture on blur
+// inputs (masked)
 export function registerInputs() {
   addEventListener(
-    "blur",
+    "input",
     (e) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
       if (!target) return;
