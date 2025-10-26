@@ -141,11 +141,68 @@ export function registerFocus() {
   );
 }
 
-// visible text (light snapshot)
+// Recursively collect all visible text including shadow DOM
+function collectAllVisibleText(
+  node: Element | ShadowRoot | Document,
+  depth = 0,
+): string {
+  const MAX_DEPTH = 50; // Prevent infinite recursion
+  if (depth > MAX_DEPTH) return "";
+
+  const texts: string[] = [];
+
+  // If this is an Element, check if it's visible and collect its direct text
+  if (node instanceof Element) {
+    // Skip hidden elements
+    if (node instanceof HTMLElement) {
+      const style = window.getComputedStyle(node);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.opacity === "0"
+      ) {
+        return "";
+      }
+    }
+
+    // Collect direct text nodes (not from descendants)
+    for (const child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent?.trim();
+        if (text) texts.push(text);
+      }
+    }
+  }
+
+  // Traverse shadow DOM
+  if (node instanceof Element && node.shadowRoot) {
+    const shadowText = collectAllVisibleText(node.shadowRoot, depth + 1);
+    if (shadowText) texts.push(shadowText);
+  }
+
+  // Recursively traverse children
+  const children =
+    node instanceof Document
+      ? node.body?.children || []
+      : node instanceof ShadowRoot
+        ? node.children
+        : node.children || [];
+
+  for (const child of Array.from(children)) {
+    const childText = collectAllVisibleText(child, depth + 1);
+    if (childText) texts.push(childText);
+  }
+
+  return texts.join(" ");
+}
+
+// visible text (comprehensive snapshot including shadow DOM)
 export function registerVisibleText() {
   const snap = () => {
-    const text = document.body?.innerText ?? "";
+    console.log("Taking visible text snapshot...");
+    const text = collectAllVisibleText(document);
+    console.log("Visible text snapshot:", text);
     if (text.trim()) emit("visible_text", { text });
   };
-  addEventListener("DOMContentLoaded", snap);
+  snap();
 }
