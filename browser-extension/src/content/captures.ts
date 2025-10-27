@@ -196,13 +196,51 @@ function collectAllVisibleText(
   return texts.join(" ");
 }
 
+// Capture visible text snapshot - called by various triggers
+function captureVisibleText() {
+  const text = collectAllVisibleText(document);
+  if (text.trim()) emit("visible_text", { text });
+}
+
 // visible text (comprehensive snapshot including shadow DOM)
+// Triggered on: initial load, navigation, clicks, inputs, scroll
 export function registerVisibleText() {
-  const snap = () => {
-    console.log("Taking visible text snapshot...");
-    const text = collectAllVisibleText(document);
-    console.log("Visible text snapshot:", text);
-    if (text.trim()) emit("visible_text", { text });
+  // Initial snapshot: check if DOM is ready, otherwise wait for DOMContentLoaded
+  if (document.readyState === "loading") {
+    addEventListener("DOMContentLoaded", captureVisibleText);
+  } else {
+    captureVisibleText();
+  }
+
+  // Capture on navigation (SPA route changes)
+  const _push = history.pushState;
+  history.pushState = function (...args) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _push.apply(this, args as any);
+    captureVisibleText();
   };
-  snap();
+
+  addEventListener("popstate", captureVisibleText);
+
+  // Capture on clicks
+  addEventListener("click", captureVisibleText, { capture: true });
+
+  // Capture on inputs
+  addEventListener("input", captureVisibleText, { capture: true });
+
+  // Capture on scroll (only if scrolled more than threshold)
+  let lastScrollY = window.scrollY;
+  const SCROLL_THRESHOLD = 200; // pixels
+
+  addEventListener(
+    "scroll",
+    () => {
+      const currentScrollY = window.scrollY;
+      if (Math.abs(currentScrollY - lastScrollY) >= SCROLL_THRESHOLD) {
+        captureVisibleText();
+        lastScrollY = currentScrollY;
+      }
+    },
+    { passive: true },
+  );
 }
