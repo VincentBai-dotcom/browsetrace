@@ -63,6 +63,11 @@ func createTables(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_input_lookup
 	ON events(session_id, field_id)
 	WHERE type = 'input';
+
+	-- Unique index for visible_text event deduplication (one visible_text per url+session)
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_visible_text_session
+	ON events(url, session_id)
+	WHERE type = 'visible_text';
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create database tables: %w", err)
@@ -105,7 +110,7 @@ func (d *Database) InsertEvents(events []models.Event) error {
 	defer insertStmt.Close()
 
 	// Prepare statement for UPSERT (input events)
-	upsertStmt, err := transaction.Prepare(`
+	upsertInputStmt, err := transaction.Prepare(`
 		INSERT INTO events(ts_utc, ts_iso, url, title, type, data_json, session_id, field_id)
 		VALUES(?,?,?,?,?,json(?),?,?)
 		ON CONFLICT(url, field_id, session_id)
@@ -117,9 +122,26 @@ func (d *Database) InsertEvents(events []models.Event) error {
 	`)
 	if err != nil {
 		_ = transaction.Rollback()
-		return fmt.Errorf("failed to prepare upsert statement: %w", err)
+		return fmt.Errorf("failed to prepare input upsert statement: %w", err)
 	}
-	defer upsertStmt.Close()
+	defer upsertInputStmt.Close()
+
+	// Prepare statement for UPSERT (visible_text events)
+	upsertVisibleTextStmt, err := transaction.Prepare(`
+		INSERT INTO events(ts_utc, ts_iso, url, title, type, data_json, session_id, field_id)
+		VALUES(?,?,?,?,?,json(?),?,?)
+		ON CONFLICT(url, session_id) WHERE type = 'visible_text'
+		DO UPDATE SET
+			ts_utc = excluded.ts_utc,
+			ts_iso = excluded.ts_iso,
+			title = excluded.title,
+			data_json = excluded.data_json
+	`)
+	if err != nil {
+		_ = transaction.Rollback()
+		return fmt.Errorf("failed to prepare visible_text upsert statement: %w", err)
+	}
+	defer upsertVisibleTextStmt.Close()
 
 	for _, event := range events {
 		if err := d.ValidateEvent(event); err != nil {
@@ -133,10 +155,12 @@ func (d *Database) InsertEvents(events []models.Event) error {
 			return fmt.Errorf("failed to marshal event data: %w", err)
 		}
 
-		// Use UPSERT for input events, regular INSERT for others
+		// Use UPSERT for input and visible_text events, regular INSERT for others
 		var stmt *sql.Stmt
 		if event.Type == "input" && event.FieldID != nil && event.SessionID != nil {
-			stmt = upsertStmt
+			stmt = upsertInputStmt
+		} else if event.Type == "visible_text" && event.SessionID != nil {
+			stmt = upsertVisibleTextStmt
 		} else {
 			stmt = insertStmt
 		}

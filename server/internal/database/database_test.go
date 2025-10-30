@@ -895,3 +895,232 @@ func TestInputEventUpsertMultipleUpdates(t *testing.T) {
 		t.Errorf("Expected final timestamp %d, got %d", expectedTS, tsUTC)
 	}
 }
+
+func TestVisibleTextEventUpsert(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	url := "https://example.com"
+
+	// Insert first visible_text event
+	events1 := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       url,
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Initial page content"},
+			SessionID: &sessionID,
+		},
+	}
+
+	if err := db.InsertEvents(events1); err != nil {
+		t.Fatalf("Failed to insert first visible_text event: %v", err)
+	}
+
+	// Insert second visible_text event with same url and session_id (should UPSERT)
+	events2 := []models.Event{
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       url,
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Updated page content after interaction"},
+			SessionID: &sessionID,
+		},
+	}
+
+	if err := db.InsertEvents(events2); err != nil {
+		t.Fatalf("Failed to upsert visible_text event: %v", err)
+	}
+
+	// Verify only one event exists (upserted, not inserted as new)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'visible_text'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("Expected 1 visible_text event after upsert, got %d", count)
+	}
+
+	// Verify the timestamp and data were updated
+	var tsUTC int64
+	var dataJSON string
+	err = db.db.QueryRow("SELECT ts_utc, data_json FROM events WHERE type = 'visible_text'").Scan(&tsUTC, &dataJSON)
+	if err != nil {
+		t.Fatalf("Failed to query event: %v", err)
+	}
+
+	if tsUTC != 2000000000000 {
+		t.Errorf("Expected timestamp 2000000000000, got %d", tsUTC)
+	}
+
+	if !containsString(dataJSON, "Updated page content") {
+		t.Errorf("Expected updated text content, got: %s", dataJSON)
+	}
+}
+
+func TestVisibleTextEventUpsertDifferentURLs(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+
+	// Insert visible_text events with same session_id but different URLs
+	events := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       "https://example.com/page1",
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Page 1 content"},
+			SessionID: &sessionID,
+		},
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       "https://example.com/page2",
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Page 2 content"},
+			SessionID: &sessionID,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert visible_text events: %v", err)
+	}
+
+	// Verify both events exist (different URLs)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'visible_text'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 visible_text events with different URLs, got %d", count)
+	}
+}
+
+func TestVisibleTextEventUpsertDifferentSessions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	session1 := "session-1"
+	session2 := "session-2"
+	url := "https://example.com"
+
+	// Insert visible_text events with same URL but different sessions
+	events := []models.Event{
+		{
+			TSUTC:     1000000000000,
+			TSISO:     "2001-09-09T01:46:40Z",
+			URL:       url,
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Session 1 content"},
+			SessionID: &session1,
+		},
+		{
+			TSUTC:     2000000000000,
+			TSISO:     "2033-05-18T03:33:20Z",
+			URL:       url,
+			Type:      "visible_text",
+			Data:      map[string]any{"text": "Session 2 content"},
+			SessionID: &session2,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert visible_text events: %v", err)
+	}
+
+	// Verify both events exist (different sessions)
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'visible_text'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 visible_text events with different sessions, got %d", count)
+	}
+}
+
+func TestVisibleTextEventUpsertMultipleUpdates(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	sessionID := "test-session-123"
+	url := "https://example.com"
+
+	// Simulate multiple visible_text captures as page content changes
+	texts := []string{
+		"Initial content",
+		"Content after click",
+		"Content after input",
+		"Content after scroll",
+		"Final content",
+	}
+
+	for i, text := range texts {
+		events := []models.Event{
+			{
+				TSUTC:     int64(1000000000000 + i*1000),
+				TSISO:     "2001-09-09T01:46:40Z",
+				URL:       url,
+				Type:      "visible_text",
+				Data:      map[string]any{"text": text},
+				SessionID: &sessionID,
+			},
+		}
+
+		if err := db.InsertEvents(events); err != nil {
+			t.Fatalf("Failed to insert/update visible_text event %d: %v", i, err)
+		}
+	}
+
+	// Verify only one event exists with the final value
+	var count int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM events WHERE type = 'visible_text'").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to query count: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("Expected 1 visible_text event after multiple upserts, got %d", count)
+	}
+
+	// Verify it has the final timestamp and text
+	var tsUTC int64
+	var dataJSON string
+	err = db.db.QueryRow("SELECT ts_utc, data_json FROM events WHERE type = 'visible_text'").Scan(&tsUTC, &dataJSON)
+	if err != nil {
+		t.Fatalf("Failed to query event: %v", err)
+	}
+
+	expectedTS := int64(1000000000000 + 4*1000) // Last timestamp
+	if tsUTC != expectedTS {
+		t.Errorf("Expected final timestamp %d, got %d", expectedTS, tsUTC)
+	}
+
+	if !containsString(dataJSON, "Final content") {
+		t.Errorf("Expected final text content, got: %s", dataJSON)
+	}
+}
+
+// Helper function to check if a string contains a substring
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

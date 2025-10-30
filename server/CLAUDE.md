@@ -34,6 +34,7 @@ The codebase follows Go project layout conventions with clear separation of conc
    - Validates events before insertion (both Go-level and database constraints)
    - Uses transactions for atomic batch inserts
    - Stores arbitrary JSON data in `data_json` column with validation
+   - Implements upsert logic for `input` and `visible_text` events to prevent duplicates within a session
 
 3. **Server layer (`internal/server/server.go`)**:
    - Standard library HTTP server with timeouts (5s read/write)
@@ -143,7 +144,7 @@ The SQLite database has a single `events` table:
 - `title`: TEXT (nullable page title)
 - `type`: TEXT (constrained to valid event types)
 - `data_json`: TEXT (validated JSON)
-- `session_id`: TEXT (nullable, used for input event deduplication)
+- `session_id`: TEXT (nullable, used for input and visible_text event deduplication)
 - `field_id`: TEXT (nullable, used for input event deduplication)
 
 Indexes exist for query performance:
@@ -152,6 +153,11 @@ Indexes exist for query performance:
 - `idx_events_url`: Index on `url` for URL-based queries
 - `idx_input_field_session`: Unique composite index on `(url, field_id, session_id)` for input event deduplication
 - `idx_input_lookup`: Partial index on `(session_id, field_id) WHERE type = 'input'` for faster input event lookups
+- `idx_visible_text_session`: Unique partial index on `(url, session_id) WHERE type = 'visible_text'` for visible_text event deduplication
+
+**Event Deduplication:**
+- **Input events**: Deduplicated by `(url, field_id, session_id)`. Multiple input events to the same field on the same page within a session will update the existing record (upsert behavior).
+- **Visible_text events**: Deduplicated by `(url, session_id)`. Multiple visible_text captures on the same page within a session will update the existing record with the latest timestamp and text content.
 
 ## Error Handling
 
