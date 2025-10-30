@@ -143,8 +143,15 @@ The SQLite database has a single `events` table:
 - `title`: TEXT (nullable page title)
 - `type`: TEXT (constrained to valid event types)
 - `data_json`: TEXT (validated JSON)
+- `session_id`: TEXT (nullable, used for input event deduplication)
+- `field_id`: TEXT (nullable, used for input event deduplication)
 
-Indexes exist on `ts_utc`, `type`, and `url` for query performance.
+Indexes exist for query performance:
+- `idx_events_ts`: Index on `ts_utc` for time-based queries
+- `idx_events_type`: Index on `type` for event type filtering
+- `idx_events_url`: Index on `url` for URL-based queries
+- `idx_input_field_session`: Unique composite index on `(url, field_id, session_id)` for input event deduplication
+- `idx_input_lookup`: Partial index on `(session_id, field_id) WHERE type = 'input'` for faster input event lookups
 
 ## Error Handling
 
