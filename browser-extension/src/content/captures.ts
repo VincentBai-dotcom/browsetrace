@@ -29,7 +29,10 @@ export function registerClicks() {
       const target = e.target as Element | null;
       if (!target) return;
       const selector = cssPath(target);
-      const text = (target as HTMLElement).innerText?.slice(0, 120) ?? "";
+      const text = (target as HTMLElement).innerText ?? "";
+      if (!text || text.trim() === "") {
+        return;
+      }
       emit("click", { selector, text });
     },
     { capture: true },
@@ -132,9 +135,11 @@ export function registerFocus() {
     (e) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
       if (!target) return;
+      const value = target.value ?? "";
+      if (!value || value.trim() === "") return;
       emit("focus", {
         selector: cssPath(target),
-        value: target.value ?? "",
+        value,
       });
     },
     true,
@@ -153,6 +158,19 @@ function collectAllVisibleText(
 
   // If this is an Element, check if it's visible and collect its direct text
   if (node instanceof Element) {
+    // Skip non-content elements (style, script, etc.)
+    const tagName = node.tagName?.toLowerCase();
+    if (
+      tagName === "style" ||
+      tagName === "script" ||
+      tagName === "noscript" ||
+      tagName === "iframe" ||
+      tagName === "object" ||
+      tagName === "embed"
+    ) {
+      return "";
+    }
+
     // Skip hidden elements
     if (node instanceof HTMLElement) {
       const style = window.getComputedStyle(node);
