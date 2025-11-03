@@ -2,15 +2,19 @@ import { useState, useEffect } from 'react';
 import './index.css';
 import { EventFilter } from './components/EventFilter';
 import { EventsTable } from './components/EventsTable';
-import { getEvents } from '../services/api';
+import { getEvents, deleteAllEvents } from '../services/api';
 import type { Event, EventFilter as EventFilterType } from '../types/events';
 import { Activity, Database } from 'lucide-react';
+import { useToast } from './components/ui/use-toast';
+import { Toaster } from './components/ui/toaster';
 
 function App() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentFilter, setCurrentFilter] = useState<EventFilterType>({ limit: 100 });
+  const { toast } = useToast();
 
   const fetchEvents = async (filter: EventFilterType) => {
     setLoading(true);
@@ -42,6 +46,27 @@ function App() {
     fetchEvents(currentFilter);
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const result = await deleteAllEvents();
+      toast({
+        title: 'Success',
+        description: `Deleted ${result.deleted_count.toLocaleString()} events successfully`,
+      });
+      // Refresh the events list
+      await fetchEvents(currentFilter);
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to delete events',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Load events on mount
   useEffect(() => {
     fetchEvents(currentFilter);
@@ -68,8 +93,16 @@ function App() {
       </header>
       <main className="container mx-auto px-6 py-6 space-y-6">
         <EventFilter onFilterChange={handleFilterChange} />
-        <EventsTable events={events} loading={loading} error={error} onRefresh={handleRefresh} />
+        <EventsTable
+          events={events}
+          loading={loading}
+          error={error}
+          onRefresh={handleRefresh}
+          onDelete={handleDelete}
+          deleting={deleting}
+        />
       </main>
+      <Toaster />
     </div>
   );
 }

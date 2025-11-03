@@ -32,7 +32,7 @@ func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Allow requests from Electron app (localhost with any port)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		// Handle preflight requests
@@ -55,8 +55,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, req *http.Request) {
 		s.handlePostEvents(w, req)
 	case http.MethodGet:
 		s.handleGetEvents(w, req)
+	case http.MethodDelete:
+		s.handleDeleteEvents(w, req)
 	default:
-		http.Error(w, "GET or POST only", http.StatusMethodNotAllowed)
+		http.Error(w, "GET, POST, or DELETE only", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -126,6 +128,39 @@ func (s *Server) handleGetEvents(w http.ResponseWriter, req *http.Request) {
 	response := models.Batch{Events: events}
 	if events == nil {
 		response.Events = []models.Event{}
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("JSON encoding error: %v", err)
+	}
+}
+
+func (s *Server) handleDeleteEvents(w http.ResponseWriter, req *http.Request) {
+	log.Println("Deleting all events...")
+
+	// Delete all events
+	count, err := s.db.DeleteAllEvents()
+	if err != nil {
+		log.Printf("Database error during deletion: %v", err)
+		http.Error(w, "Failed to delete events", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Deleted %d events", count)
+
+	// Run VACUUM to reclaim disk space
+	log.Println("Running VACUUM to reclaim disk space...")
+	if err := s.db.VacuumDatabase(); err != nil {
+		log.Printf("Warning: VACUUM failed: %v", err)
+		// Don't fail the request if VACUUM fails, deletion was successful
+	} else {
+		log.Println("VACUUM completed successfully")
+	}
+
+	// Return success response with count
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"deleted_count": count,
+		"message":       "All events deleted successfully",
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("JSON encoding error: %v", err)

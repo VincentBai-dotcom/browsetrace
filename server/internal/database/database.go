@@ -260,3 +260,27 @@ func (d *Database) GetEvents(filter EventFilter) ([]models.Event, error) {
 
 	return events, nil
 }
+
+// DeleteAllEvents removes all events from the database and returns the count of deleted rows
+func (d *Database) DeleteAllEvents() (int64, error) {
+	result, err := d.db.Exec("DELETE FROM events")
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete events: %w", err)
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	return count, nil
+}
+
+// VacuumDatabase reclaims unused space in the database file after deletions
+func (d *Database) VacuumDatabase() error {
+	_, err := d.db.Exec("VACUUM")
+	if err != nil {
+		return fmt.Errorf("failed to vacuum database: %w", err)
+	}
+	return nil
+}

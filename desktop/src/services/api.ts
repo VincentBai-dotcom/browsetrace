@@ -38,3 +38,20 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export interface DeleteResponse {
+  deleted_count: number;
+  message: string;
+}
+
+export async function deleteAllEvents(): Promise<DeleteResponse> {
+  const response = await fetch(`${API_BASE_URL}/events`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete events: ${response.statusText}`);
+  }
+
+  return response.json();
+}

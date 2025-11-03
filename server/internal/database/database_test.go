@@ -1124,3 +1124,195 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestDeleteAllEvents(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert some test events
+	title1 := "Page 1"
+	title2 := "Page 2"
+	title3 := "Page 3"
+	sessionID := "session-123"
+	fieldID := "#input"
+
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000,
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com/page1",
+			Title: &title1,
+			Type:  "navigate",
+			Data:  map[string]any{"foo": "bar"},
+		},
+		{
+			TSUTC: 1000000001000,
+			TSISO: "2001-09-09T01:46:41Z",
+			URL:   "https://example.com/page2",
+			Title: &title2,
+			Type:  "click",
+			Data:  map[string]any{"selector": "#button"},
+		},
+		{
+			TSUTC:     1000000002000,
+			TSISO:     "2001-09-09T01:46:42Z",
+			URL:       "https://example.com/page3",
+			Title:     &title3,
+			Type:      "input",
+			Data:      map[string]any{"value": "test"},
+			SessionID: &sessionID,
+			FieldID:   &fieldID,
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert test events: %v", err)
+	}
+
+	// Verify events were inserted
+	filter := EventFilter{Limit: 100}
+	retrievedEvents, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("Failed to retrieve events: %v", err)
+	}
+	if len(retrievedEvents) != 3 {
+		t.Fatalf("Expected 3 events, got %d", len(retrievedEvents))
+	}
+
+	// Delete all events
+	count, err := db.DeleteAllEvents()
+	if err != nil {
+		t.Fatalf("Failed to delete events: %v", err)
+	}
+	if count != 3 {
+		t.Errorf("Expected to delete 3 events, got %d", count)
+	}
+
+	// Verify all events are deleted
+	retrievedEvents, err = db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("Failed to retrieve events after deletion: %v", err)
+	}
+	if len(retrievedEvents) != 0 {
+		t.Errorf("Expected 0 events after deletion, got %d", len(retrievedEvents))
+	}
+}
+
+func TestDeleteAllEventsEmpty(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Delete from empty database
+	count, err := db.DeleteAllEvents()
+	if err != nil {
+		t.Fatalf("Failed to delete from empty database: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("Expected to delete 0 events from empty database, got %d", count)
+	}
+}
+
+func TestVacuumDatabase(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert many events
+	title := "Test Page"
+	events := make([]models.Event, 1000)
+	for i := 0; i < 1000; i++ {
+		events[i] = models.Event{
+			TSUTC: int64(1000000000000 + i*1000),
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com/page",
+			Title: &title,
+			Type:  "navigate",
+			Data:  map[string]any{"index": i},
+		}
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert events: %v", err)
+	}
+
+	// Delete all events
+	_, err := db.DeleteAllEvents()
+	if err != nil {
+		t.Fatalf("Failed to delete events: %v", err)
+	}
+
+	// Run VACUUM
+	err = db.VacuumDatabase()
+	if err != nil {
+		t.Fatalf("Failed to vacuum database: %v", err)
+	}
+
+	// Verify database is still functional after VACUUM
+	afterVacuumTitle := "After Vacuum"
+	testEvent := models.Event{
+		TSUTC: 2000000000000,
+		TSISO: "2033-05-18T03:33:20Z",
+		URL:   "https://example.com/after-vacuum",
+		Title: &afterVacuumTitle,
+		Type:  "navigate",
+		Data:  map[string]any{"test": "vacuum"},
+	}
+
+	if err := db.InsertEvents([]models.Event{testEvent}); err != nil {
+		t.Fatalf("Failed to insert event after vacuum: %v", err)
+	}
+
+	filter := EventFilter{Limit: 10}
+	retrievedEvents, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("Failed to retrieve events after vacuum: %v", err)
+	}
+	if len(retrievedEvents) != 1 {
+		t.Errorf("Expected 1 event after vacuum, got %d", len(retrievedEvents))
+	}
+}
+
+func TestDeleteAndVacuumIntegration(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Insert test events
+	title := "Test"
+	events := []models.Event{
+		{
+			TSUTC: 1000000000000,
+			TSISO: "2001-09-09T01:46:40Z",
+			URL:   "https://example.com",
+			Title: &title,
+			Type:  "navigate",
+			Data:  map[string]any{"test": "data"},
+		},
+	}
+
+	if err := db.InsertEvents(events); err != nil {
+		t.Fatalf("Failed to insert events: %v", err)
+	}
+
+	// Delete all and vacuum in sequence (simulating API endpoint behavior)
+	count, err := db.DeleteAllEvents()
+	if err != nil {
+		t.Fatalf("Failed to delete events: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("Expected to delete 1 event, got %d", count)
+	}
+
+	err = db.VacuumDatabase()
+	if err != nil {
+		t.Fatalf("Failed to vacuum after delete: %v", err)
+	}
+
+	// Verify database is clean and functional
+	filter := EventFilter{Limit: 100}
+	retrievedEvents, err := db.GetEvents(filter)
+	if err != nil {
+		t.Fatalf("Failed to query events: %v", err)
+	}
+	if len(retrievedEvents) != 0 {
+		t.Errorf("Expected 0 events, got %d", len(retrievedEvents))
+	}
+}
