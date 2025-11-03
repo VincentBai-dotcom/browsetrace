@@ -4,9 +4,8 @@ import { EventFilter } from './components/EventFilter';
 import { EventsTable } from './components/EventsTable';
 import { getEvents, deleteAllEvents } from '../services/api';
 import type { Event, EventFilter as EventFilterType } from '../types/events';
-import { Activity, Database } from 'lucide-react';
-import { useToast } from './components/ui/use-toast';
-import { Toaster } from './components/ui/toaster';
+import { Activity, Database, CheckCircle2, XCircle } from 'lucide-react';
+import { Alert, AlertDescription } from './components/ui/alert';
 
 function App() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -14,7 +13,10 @@ function App() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentFilter, setCurrentFilter] = useState<EventFilterType>({ limit: 100 });
-  const { toast } = useToast();
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const fetchEvents = async (filter: EventFilterType) => {
     setLoading(true);
@@ -50,18 +52,21 @@ function App() {
     setDeleting(true);
     try {
       const result = await deleteAllEvents();
-      toast({
-        title: 'Success',
-        description: `Deleted ${result.deleted_count.toLocaleString()} events successfully`,
+      setNotification({
+        type: 'success',
+        message: `Deleted ${result.deleted_count.toLocaleString()} events successfully`,
       });
+      // Auto-hide notification after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
       // Refresh the events list
       await fetchEvents(currentFilter);
     } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to delete events',
-        variant: 'destructive',
+      setNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to delete events',
       });
+      // Auto-hide notification after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setDeleting(false);
     }
@@ -92,6 +97,19 @@ function App() {
         </div>
       </header>
       <main className="container mx-auto px-6 py-6 space-y-6">
+        {notification && (
+          <Alert
+            variant={notification.type === 'error' ? 'destructive' : 'default'}
+            className="flex items-center gap-2"
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
+            <AlertDescription>{notification.message}</AlertDescription>
+          </Alert>
+        )}
         <EventFilter onFilterChange={handleFilterChange} />
         <EventsTable
           events={events}
@@ -102,7 +120,6 @@ function App() {
           deleting={deleting}
         />
       </main>
-      <Toaster />
     </div>
   );
 }

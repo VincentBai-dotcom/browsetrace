@@ -41,7 +41,14 @@ interface EventsTableProps {
   deleting?: boolean;
 }
 
-export function EventsTable({ events, loading, error, onRefresh, onDelete, deleting = false }: EventsTableProps) {
+export function EventsTable({
+  events,
+  loading,
+  error,
+  onRefresh,
+  onDelete,
+  deleting = false,
+}: EventsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const toggleRow = (index: number) => {
@@ -108,12 +115,16 @@ export function EventsTable({ events, loading, error, onRefresh, onDelete, delet
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete all browsing events from the database.
+                      This action cannot be undone. This will permanently delete all browsing events
+                      from the database.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogAction
+                      onClick={onDelete}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                    >
                       Delete All Events
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -169,12 +180,16 @@ export function EventsTable({ events, loading, error, onRefresh, onDelete, delet
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete all {events.length.toLocaleString()} browsing events from the database.
+                    This action cannot be undone. This will permanently delete all{' '}
+                    {events.length.toLocaleString()} browsing events from the database.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  <AlertDialogAction
+                    onClick={onDelete}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
                     Delete All Events
                   </AlertDialogAction>
                 </AlertDialogFooter>
