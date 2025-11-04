@@ -3,7 +3,7 @@
   "description": "Base Level Extension",
   "version": "1.0",
   "manifest_version": 3,
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "./icons/browser_trace.png"
