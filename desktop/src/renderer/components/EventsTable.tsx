@@ -282,7 +282,7 @@ export function EventsTable({
                         <TableCell colSpan={5} className="bg-muted/30">
                           <div className="p-4 space-y-2">
                             <h4 className="text-sm font-semibold mb-2">Event Data</h4>
-                            <pre className="bg-card p-4 rounded-lg text-xs overflow-auto max-h-[300px] border">
+                            <pre className="bg-card p-4 rounded-lg text-xs overflow-auto max-h-[300px] border whitespace-pre-wrap break-words">
                               {formatData(event.data)}
                             </pre>
                           </div>
