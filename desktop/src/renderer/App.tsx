@@ -7,12 +7,15 @@ import type { Event, EventFilter as EventFilterType } from '../types/events';
 import { Activity, Database, CheckCircle2, XCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './components/ui/alert';
 
+const PAGE_SIZE = 50; // Events per page
+
 function App() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentFilter, setCurrentFilter] = useState<EventFilterType>({ limit: 100 });
+  const [currentFilter, setCurrentFilter] = useState<EventFilterType>({ limit: 1000 });
+  const [currentPage, setCurrentPage] = useState(1);
   const [notification, setNotification] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -41,11 +44,19 @@ function App() {
 
   const handleFilterChange = (filter: EventFilterType) => {
     setCurrentFilter(filter);
+    setCurrentPage(1); // Reset to first page on filter change
     fetchEvents(filter);
   };
 
   const handleRefresh = () => {
+    setCurrentPage(1); // Reset to first page on refresh
     fetchEvents(currentFilter);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async () => {
@@ -76,6 +87,12 @@ function App() {
   useEffect(() => {
     fetchEvents(currentFilter);
   }, []);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(events.length / PAGE_SIZE);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+  const paginatedEvents = events.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,12 +129,16 @@ function App() {
         )}
         <EventFilter onFilterChange={handleFilterChange} />
         <EventsTable
-          events={events}
+          events={paginatedEvents}
+          totalEvents={events.length}
           loading={loading}
           error={error}
           onRefresh={handleRefresh}
           onDelete={handleDelete}
           deleting={deleting}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
         />
       </main>
     </div>

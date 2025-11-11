@@ -31,23 +31,40 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './ui/alert-dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from './ui/pagination';
 
 interface EventsTableProps {
   events: Event[];
+  totalEvents: number;
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
   onDelete: () => void;
   deleting?: boolean;
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 }
 
 export function EventsTable({
   events,
+  totalEvents,
   loading,
   error,
   onRefresh,
   onDelete,
   deleting = false,
+  currentPage,
+  totalPages,
+  onPageChange,
 }: EventsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
@@ -154,14 +171,20 @@ export function EventsTable({
     return JSON.stringify(data, null, 2);
   };
 
+  // Calculate pagination display info
+  const startItem = totalEvents === 0 ? 0 : (currentPage - 1) * 50 + 1;
+  const endItem = Math.min(currentPage * 50, totalEvents);
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Events ({events.length.toLocaleString()})</CardTitle>
+            <CardTitle>Events ({totalEvents.toLocaleString()})</CardTitle>
             <CardDescription>
-              {events.length === 1 ? '1 result found' : `${events.length} results found`}
+              {totalEvents === 0
+                ? 'No results found'
+                : `Showing ${startItem.toLocaleString()} - ${endItem.toLocaleString()} of ${totalEvents.toLocaleString()} results`}
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -272,6 +295,63 @@ export function EventsTable({
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <div className="mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
+                    className={
+                      currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current
+                  const showPage =
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1);
+
+                  if (!showPage) {
+                    // Show ellipsis
+                    if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => onPageChange(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
+                    className={
+                      currentPage === totalPages
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
