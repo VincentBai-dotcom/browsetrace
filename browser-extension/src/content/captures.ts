@@ -1,4 +1,5 @@
 import { emit, cssPath } from "./utils";
+import { SCROLL_DEBOUNCE_MS } from "./config";
 
 // navigation + SPA changes
 export function registerNavigation() {
@@ -246,19 +247,25 @@ export function registerVisibleText() {
   // Capture on inputs
   addEventListener("input", captureVisibleText, { capture: true });
 
-  // Capture on scroll (only if scrolled more than threshold)
-  let lastScrollY = window.scrollY;
-  const SCROLL_THRESHOLD = 200; // pixels
+  // Capture on scroll (debounced to avoid performance issues)
+  // Note: Using document with capture:true to catch scrolls on ANY element (divs, window, etc)
+  // because scroll events don't bubble - needed for apps like ChatGPT with scrollable containers
+  let scrollTimer: number | null = null;
 
-  addEventListener(
+  document.addEventListener(
     "scroll",
     () => {
-      const currentScrollY = window.scrollY;
-      if (Math.abs(currentScrollY - lastScrollY) >= SCROLL_THRESHOLD) {
-        captureVisibleText();
-        lastScrollY = currentScrollY;
+      // Clear existing timer
+      if (scrollTimer !== null) {
+        window.clearTimeout(scrollTimer);
       }
+
+      // Set new timer to capture after user stops scrolling
+      scrollTimer = window.setTimeout(() => {
+        scrollTimer = null;
+        captureVisibleText();
+      }, SCROLL_DEBOUNCE_MS);
     },
-    { passive: true },
+    { capture: true, passive: true },
   );
 }
