@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { setupBrowseTraceServer } from './server.js';
 import dotenv from 'dotenv';
@@ -10,17 +10,13 @@ dotenv.config();
 
 async function main() {
   // Create MCP server instance
-  const server = new Server(
-    {
-      name: 'browsetrace-mcp',
-      version: '1.0.0',
+  const server = new McpServer({
+    name: 'browsetrace-mcp',
+    version: '1.0.0',
+    capabilities: {
+      tools: {},
     },
-    {
-      capabilities: {
-        tools: {},
-      },
-    }
-  );
+  });
 
   // Set up BrowseTrace tools
   setupBrowseTraceServer(server);
@@ -29,19 +25,10 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // Error handling
-  process.on('SIGINT', async () => {
-    await server.close();
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    await server.close();
-    process.exit(0);
-  });
+  console.error('BrowseTrace MCP Server running on stdio');
 }
 
 main().catch((error) => {
-  console.error('Fatal error:', error);
+  console.error('Fatal error in main():', error);
   process.exit(1);
 });
