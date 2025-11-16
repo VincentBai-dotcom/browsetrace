@@ -8,9 +8,6 @@ dependencies:
   '@modelcontextprotocol/sdk':
     specifier: ^1.21.1
     version: 1.22.0
-  dotenv:
-    specifier: ^17.2.3
-    version: 17.2.3
   zod:
     specifier: ^3.25.76
     version: 3.25.76
@@ -414,11 +411,6 @@ packages:
   /depd@2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
-    dev: false
-
-  /dotenv@17.2.3:
-    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
-    engines: {node: '>=12'}
     dev: false
 
   /dunder-proto@1.0.1:
