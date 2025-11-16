@@ -17,6 +17,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$ROOT_DIR/server"
 DESKTOP_DIR="$ROOT_DIR/desktop"
 EXTENSION_DIR="$ROOT_DIR/browser-extension"
+MCP_SERVER_DIR="$ROOT_DIR/mcp-server"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  BrowseTrace Development Environment${NC}"
@@ -71,8 +72,16 @@ if [ ! -d "$EXTENSION_DIR/node_modules" ]; then
     echo ""
 fi
 
+# Check if mcp-server dependencies are installed
+if [ ! -d "$MCP_SERVER_DIR/node_modules" ]; then
+    echo -e "${YELLOW}Installing MCP server dependencies...${NC}"
+    cd "$MCP_SERVER_DIR"
+    pnpm install
+    echo ""
+fi
+
 # Build browser extension first (wait for completion)
-echo -e "${GREEN}[1/3] Building Browser Extension...${NC}"
+echo -e "${GREEN}[1/4] Building Browser Extension...${NC}"
 cd "$EXTENSION_DIR"
 pnpm build
 
@@ -85,7 +94,7 @@ EXTENSION_PID=$!
 sleep 3
 
 # Start Go server in background
-echo -e "${GREEN}[2/3] Starting Go HTTP Server...${NC}"
+echo -e "${GREEN}[2/4] Starting Go HTTP Server...${NC}"
 cd "$SERVER_DIR"
 go run ./cmd/browsetrace-agent 2>&1 | sed "s/^/[SERVER] /" &
 SERVER_PID=$!
@@ -99,7 +108,26 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
     exit 1
 fi
 
-echo -e "${GREEN}[3/3] Starting Electron Desktop App...${NC}"
+# Build and start MCP server
+echo -e "${GREEN}[3/4] Building and Starting MCP Server...${NC}"
+cd "$MCP_SERVER_DIR"
+pnpm build
+
+# Start MCP server in dev mode (background)
+echo -e "${GREEN}      Starting MCP server...${NC}"
+pnpm dev 2>&1 | sed "s/^/[MCP] /" &
+MCP_PID=$!
+
+# Wait a bit for MCP server to start
+sleep 2
+
+# Check if MCP server is running
+if ! kill -0 $MCP_PID 2>/dev/null; then
+    echo -e "${RED}Error: MCP server failed to start${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}[4/4] Starting Electron Desktop App...${NC}"
 cd "$DESKTOP_DIR"
 pnpm start 2>&1 | sed "s/^/[DESKTOP] /" &
 DESKTOP_PID=$!
@@ -111,6 +139,7 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Extension:${NC}      Building to browser-extension/dist/"
 echo -e "${BLUE}Go Server:${NC}      http://127.0.0.1:51425"
+echo -e "${BLUE}MCP Server:${NC}     Running via stdio"
 echo -e "${BLUE}Desktop App:${NC}    Electron window should open"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all processes${NC}"

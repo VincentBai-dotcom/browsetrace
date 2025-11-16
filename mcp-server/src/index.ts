@@ -13,9 +13,6 @@ async function main() {
   const server = new McpServer({
     name: 'browsetrace-mcp',
     version: '1.0.0',
-    capabilities: {
-      tools: {},
-    },
   });
 
   // Set up BrowseTrace tools
