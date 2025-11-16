@@ -108,24 +108,10 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
     exit 1
 fi
 
-# Build and start MCP server
-echo -e "${GREEN}[3/4] Building and Starting MCP Server...${NC}"
+# Build MCP server
+echo -e "${GREEN}[3/4] Building MCP Server...${NC}"
 cd "$MCP_SERVER_DIR"
 pnpm build
-
-# Start MCP server in dev mode (background)
-echo -e "${GREEN}      Starting MCP server...${NC}"
-pnpm dev 2>&1 | sed "s/^/[MCP] /" &
-MCP_PID=$!
-
-# Wait a bit for MCP server to start
-sleep 2
-
-# Check if MCP server is running
-if ! kill -0 $MCP_PID 2>/dev/null; then
-    echo -e "${RED}Error: MCP server failed to start${NC}"
-    exit 1
-fi
 
 echo -e "${GREEN}[4/4] Starting Electron Desktop App...${NC}"
 cd "$DESKTOP_DIR"
@@ -139,7 +125,7 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Extension:${NC}      Building to browser-extension/dist/"
 echo -e "${BLUE}Go Server:${NC}      http://127.0.0.1:51425"
-echo -e "${BLUE}MCP Server:${NC}     Running via stdio"
+echo -e "${BLUE}MCP Server:${NC}     Built (not running)"
 echo -e "${BLUE}Desktop App:${NC}    Electron window should open"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all processes${NC}"
