@@ -1,5 +1,6 @@
 import { BrowseTraceAPI } from '../api/client.js';
 import type { Event, EventType } from '../types/events.js';
+import { formatLocalTime } from '../utils/timezone.js';
 
 const api = new BrowseTraceAPI();
 
@@ -9,15 +10,21 @@ const api = new BrowseTraceAPI();
 export async function getRecentEvents(params: {
   hours?: number;
   limit?: number;
-}): Promise<{ events: Event[]; count: number }> {
+}): Promise<{ events: Array<Event & { ts_local: string }>; count: number }> {
   const hours = params.hours ?? 24;
   const limit = params.limit ?? 100;
 
   const events = await api.getRecentEvents(hours, limit);
 
+  // Add local timezone timestamp to each event
+  const eventsWithLocal = events.map(event => ({
+    ...event,
+    ts_local: formatLocalTime(event.ts_utc),
+  }));
+
   return {
-    events,
-    count: events.length,
+    events: eventsWithLocal,
+    count: eventsWithLocal.length,
   };
 }
 
@@ -27,14 +34,20 @@ export async function getRecentEvents(params: {
 export async function getEventsByType(params: {
   type: EventType;
   limit?: number;
-}): Promise<{ events: Event[]; count: number }> {
+}): Promise<{ events: Array<Event & { ts_local: string }>; count: number }> {
   const limit = params.limit ?? 100;
 
   const events = await api.getEventsByType(params.type, limit);
 
+  // Add local timezone timestamp to each event
+  const eventsWithLocal = events.map(event => ({
+    ...event,
+    ts_local: formatLocalTime(event.ts_utc),
+  }));
+
   return {
-    events,
-    count: events.length,
+    events: eventsWithLocal,
+    count: eventsWithLocal.length,
   };
 }
 
@@ -44,7 +57,7 @@ export async function getEventsByType(params: {
 export async function searchByUrl(params: {
   urlPattern: string;
   limit?: number;
-}): Promise<{ events: Event[]; count: number }> {
+}): Promise<{ events: Array<Event & { ts_local: string }>; count: number }> {
   const limit = params.limit ?? 100;
   const pattern = params.urlPattern.toLowerCase();
 
@@ -55,9 +68,15 @@ export async function searchByUrl(params: {
     event.url.toLowerCase().includes(pattern)
   );
 
+  // Add local timezone timestamp to each event
+  const eventsWithLocal = matchedEvents.map(event => ({
+    ...event,
+    ts_local: formatLocalTime(event.ts_utc),
+  }));
+
   return {
-    events: matchedEvents,
-    count: matchedEvents.length,
+    events: eventsWithLocal,
+    count: eventsWithLocal.length,
   };
 }
 
@@ -77,7 +96,7 @@ export async function getInputHistory(params: {
       url: event.url,
       selector: data.selector,
       value: data.value,
-      timestamp: event.ts_iso,
+      timestamp: formatLocalTime(event.ts_utc),
     };
   });
 

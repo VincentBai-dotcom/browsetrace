@@ -1,5 +1,6 @@
 import { BrowseTraceAPI } from '../api/client.js';
 import type { Event, EventType, NavigateEventData, InputEventData } from '../types/events.js';
+import { formatLocalTime } from '../utils/timezone.js';
 
 const api = new BrowseTraceAPI();
 
@@ -65,8 +66,8 @@ export async function analyzeBrowsingPatterns(params: {
     mostVisitedUrls: mostVisited,
     eventTypeCounts,
     timeRange: {
-      from: new Date(minTime).toISOString(),
-      to: new Date(maxTime).toISOString(),
+      from: formatLocalTime(minTime),
+      to: formatLocalTime(maxTime),
     },
   };
 }
@@ -102,7 +103,7 @@ export async function analyzeTabSwitches(params: {
     return {
       from: data.from,
       to: data.to,
-      timestamp: event.ts_iso,
+      timestamp: formatLocalTime(event.ts_utc),
     };
   });
 
