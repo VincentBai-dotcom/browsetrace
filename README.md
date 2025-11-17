@@ -85,7 +85,3 @@ browsetrace/
 ```
 
 See [DESIGN.md](DESIGN.md) for detailed architecture and component documentation.
-
-## License
-
-See [LICENSE](LICENSE) for details.

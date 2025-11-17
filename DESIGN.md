@@ -115,8 +115,7 @@ browsetrace/
 │       └── release.yml       # Multi-platform release
 │
 ├── README.md
-├── DESIGN.md
-└── LICENSE
+└── DESIGN.md
 ```
 
 ### Desktop App Architecture
