@@ -34,15 +34,15 @@ BrowseTrace is a Chrome extension that captures comprehensive user browsing beha
 └────────────────────┬────────────────────────────────────────┘
                      │
           ┌──────────┴──────────┐
-          │ HTTP GET            │ HTTP GET
+          │ HTTP GET            │ stdio (MCP)
           ▼                     ▼
 ┌───────────────────┐   ┌──────────────────────────────────┐
-│  Desktop App      │   │  Python LLM Agent                │
-│  (Electron)       │   │  • Poll/stream events            │
-│  • UI controls    │   │  • Intent inference              │
-│  • Visualization  │   │  • AI workflows                  │
-│  • Settings       │   │  • Context-aware assistance      │
-│  • Manages server │   │                                  │
+│  Desktop App      │   │  MCP Server                      │
+│  (Electron)       │   │  • Exposes browsing data tools   │
+│  • UI controls    │   │  • Claude Desktop integration    │
+│  • Visualization  │   │  • Model Context Protocol        │
+│  • Settings       │   │  • LLM-powered workflows         │
+│  • Embeds server  │   │                                  │
 └───────────────────┘   └──────────────────────────────────┘
 ```
 
@@ -52,13 +52,13 @@ BrowseTrace is a Chrome extension that captures comprehensive user browsing beha
 
 **Go HTTP Server**: Central data hub with HTTP API, manages SQLite database
 
-**Desktop App**: Optional GUI for casual users, embeds and manages server binary
+**Desktop App**: Optional GUI for data visualization
 
-**Python LLM Agent**: Independent AI workflows, queries events via HTTP API
+**MCP Server**: Exposes browsing data to Claude Desktop and other MCP clients via Model Context Protocol
 
 ## Monorepo Structure
 
-The project is organized as a monorepo containing all four components, with the desktop app embedding the Go server and Python agent as platform-specific binaries.
+The project is organized as a monorepo containing all four components. Developers typically run the Go server standalone and use the desktop app for optional data visualization.
 
 ### Directory Layout
 
@@ -70,7 +70,7 @@ browsetrace/
 │   ├── service-worker/        # Batch forwarding to local server
 │   └── popup/                 # Extension UI
 │
-├── server/                    # Go HTTP server (current browsetrace-agent)
+├── server/                    # Go HTTP server
 │   ├── cmd/
 │   │   └── browsetrace-agent/
 │   │       └── main.go
@@ -81,19 +81,19 @@ browsetrace/
 │   ├── go.mod
 │   └── go.sum
 │
-├── agent/                     # Python LLM agent
-│   ├── agent.py              # Main agent entry point
-│   ├── requirements.txt      # Python dependencies
+├── mcp-server/                # MCP server for Claude Desktop
 │   ├── src/
-│   │   ├── intent_inference.py
-│   │   ├── event_poller.py
-│   │   └── workflows/
-│   └── pyproject.toml
+│   │   ├── index.ts          # Entry point with stdio transport
+│   │   ├── server.ts         # MCP server setup & tool registration
+│   │   ├── api/
+│   │   │   └── client.ts     # HTTP client for Go API
+│   │   └── tools/            # MCP tool implementations
+│   ├── package.json
+│   └── tsconfig.json
 │
 ├── desktop/                   # Electron desktop app
 │   ├── main/                 # Electron main process
 │   │   ├── index.ts          # App entry point
-│   │   ├── process-manager.ts # Manages Go server & Python agent
 │   │   └── ipc-handlers.ts   # IPC communication handlers
 │   ├── preload/              # Preload scripts
 │   │   └── index.ts          # Context bridge for renderer
@@ -101,29 +101,13 @@ browsetrace/
 │   │   ├── components/       # UI components
 │   │   ├── stores/           # State management
 │   │   └── App.tsx
-│   ├── resources/            # Platform-specific embedded binaries
-│   │   ├── browsetrace-server-linux
-│   │   ├── browsetrace-server-darwin
-│   │   ├── browsetrace-server-darwin-arm64
-│   │   ├── browsetrace-server-win.exe
-│   │   ├── browsetrace-agent-linux
-│   │   ├── browsetrace-agent-darwin
-│   │   ├── browsetrace-agent-darwin-arm64
-│   │   └── browsetrace-agent-win.exe
 │   ├── electron-builder.yml  # Build configuration
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── shared/                    # Shared types & schemas
-│   ├── types/
-│   │   └── events.ts         # TypeScript type definitions
-│   └── schemas/
-│       └── event.schema.json # JSON schema for validation
-│
 ├── scripts/                   # Build & development scripts
 │   ├── build-binaries.sh     # Cross-platform binary builds
-│   ├── dev.sh                # Local development setup
-│   └── release.sh            # Release automation
+│   └── dev.sh                # Local development setup
 │
 ├── .github/
 │   └── workflows/
@@ -137,23 +121,13 @@ browsetrace/
 
 ### Desktop App Architecture
 
-The desktop app serves as the unified distribution package, embedding both the Go server and Python agent:
+The desktop app provides a GUI for data visualization:
 
 ```
 Electron Desktop App
 ├── Main Process (main/)
-│   ├── Process Management
-│   │   ├── Launch Go server on startup
-│   │   ├── Launch Python agent on demand
-│   │   └── Graceful shutdown handling
-│   ├── Embedded Binaries (platform-specific)
-│   │   ├── browsetrace-server (Go)
-│   │   └── browsetrace-agent (Python)
 │   └── IPC Handlers
-│       ├── startServer()
-│       ├── stopServer()
-│       ├── startAgent()
-│       └── getServerStatus()
+│       └── Communication with renderer
 │
 ├── Preload Scripts (preload/)
 │   └── Context Bridge API
@@ -161,86 +135,93 @@ Electron Desktop App
 │       └── Type-safe communication layer
 │
 └── Renderer Process (renderer/)
-    ├── Server Status Dashboard
     ├── Event Visualization
-    ├── Agent Controls
+    ├── Browse History View
     ├── Settings & Configuration
-    └── System Tray Integration
+    └── Connects to Go server HTTP API (http://127.0.0.1:8123)
 ```
 
-### Platform-Specific Binary Management
+### Build Process
 
-**Build Matrix**: Each platform requires specific binaries
-
-| Platform | Go Server Binary | Python Agent Binary | Electron Platform |
-|----------|-----------------|---------------------|-------------------|
-| Linux x64 | `GOOS=linux GOARCH=amd64` | PyInstaller Linux | `linux` |
-| macOS Intel | `GOOS=darwin GOARCH=amd64` | PyInstaller macOS | `darwin` |
-| macOS Apple Silicon | `GOOS=darwin GOARCH=arm64` | PyInstaller macOS ARM | `darwin` (arm64) |
-| Windows x64 | `GOOS=windows GOARCH=amd64` | PyInstaller Windows | `win32` |
-
-**Binary Naming Convention**: Electron resolves binaries using platform detection:
-```
-browsetrace-server-{platform}[.exe]
-browsetrace-agent-{platform}[.exe]
+**Go Server**:
+```bash
+cd server
+go build -o bin/browsetrace-server ./cmd/browsetrace-agent
 ```
 
-**Build Process**:
-1. Build Go server for each platform: `go build -o resources/browsetrace-server-{platform}`
-2. Build Python agent with PyInstaller: `pyinstaller --onefile --name browsetrace-agent-{platform}`
-3. Place binaries in `desktop/resources/`
-4. Electron Builder copies platform-specific binaries during packaging
-5. Runtime: Process manager uses `process.platform` and `process.arch` to select correct binary
+**Desktop App**:
+```bash
+cd desktop
+npm run build
+```
+
+The desktop app assumes the Go server is already running on `http://127.0.0.1:8123`.
 
 ### Development Workflow
 
-**Local Development**:
+**Quick Start (Recommended)**:
 ```bash
-# Terminal 1: Run Go server directly
-cd server && go run ./cmd/browsetrace-agent
-
-# Terminal 2: Run Python agent directly
-cd agent && python agent.py
-
-# Terminal 3: Run Electron in dev mode (without embedded binaries)
-cd desktop && npm run dev
+./dev.sh
 ```
 
-**Building Release**:
-```bash
-# Build all platform binaries
-./scripts/build-binaries.sh
+This starts the Go server and desktop app together.
 
-# Build Electron app with embedded binaries
+**Manual Development**:
+```bash
+# Terminal 1: Run Go server
+cd server && go run ./cmd/browsetrace-agent
+
+# Terminal 2: Run desktop app in dev mode
+cd desktop && npm run dev
+
+# Terminal 3: Run MCP server for testing
+cd mcp-server && pnpm dev
+```
+
+**Building for Production**:
+```bash
+# Build Go server
+cd server && go build -o bin/browsetrace-server ./cmd/browsetrace-agent
+
+# Build desktop app
 cd desktop && npm run build
+
+# Build MCP server
+cd mcp-server && pnpm build
 ```
 
 ### Distribution Strategy
 
-**End-User Installation**:
-- Single installer per platform (DMG, NSIS/MSI, AppImage/deb)
-- Includes embedded Go server + Python agent
-- No separate installation required
-- System tray icon for background operation
-- Auto-updates via electron-updater
-
-**Developer Installation**:
+**Developer Setup (Primary Audience)**:
 - Clone monorepo
-- Run components independently for development
-- Use `scripts/dev.sh` for local setup
+- Run `./dev.sh` to start Go server and desktop app
+- Configure MCP server in Claude Desktop (see mcp-server/README.md)
+- Build custom tooling on top of the MCP server
+
+**Component Installation**:
+- **Go Server**: Build from source or run with `go run`
+- **Browser Extension**: Load unpacked extension in Chrome
+- **Desktop App**: Build with Electron or run in dev mode
+- **MCP Server**: Install as Node.js package and configure in Claude Desktop
 
 ### Component Communication
 
-All components communicate via HTTP over localhost:
+Components communicate via multiple protocols:
 
 ```
-Browser Extension → POST http://127.0.0.1:51425/events → Go Server
-Desktop App UI    → GET  http://127.0.0.1:51425/events → Go Server
-Python Agent      → GET  http://127.0.0.1:51425/events → Go Server
+Browser Extension → POST http://127.0.0.1:8123/events → Go Server
+Desktop App UI    → GET  http://127.0.0.1:8123/events → Go Server
+MCP Server        → GET  http://127.0.0.1:8123/events → Go Server
+Claude Desktop    ← stdio (MCP) ← MCP Server
 ```
 
-The HTTP API serves as the contract between components, enabling:
+**HTTP API**: Contract between browser extension, desktop app, MCP server, and Go server
 - Independent development and testing
 - Language-agnostic integration
 - Clear separation of concerns
 - Easy debugging with standard HTTP tools
+
+**MCP Protocol**: Communication between Claude Desktop and MCP Server
+- stdio transport for secure, sandboxed communication
+- Structured tool calls and responses
+- Type-safe data exchange via Zod schemas

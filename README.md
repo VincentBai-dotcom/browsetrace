@@ -1,6 +1,6 @@
 # BrowseTrace
 
-A Chrome extension that captures comprehensive browsing behavior and interactions, storing them locally for LLM-powered workflows. All data stays local and private.
+A Chrome extension that captures comprehensive browsing behavior and interactions, storing them locally for LLM-powered workflows via the Model Context Protocol (MCP). All data stays local and private.
 
 ## Architecture
 
@@ -8,31 +8,27 @@ BrowseTrace consists of four components:
 
 - **Browser Extension**: Captures user interactions (clicks, inputs, scrolls, navigation, visible text)
 - **Go HTTP Server**: Local API server with SQLite storage (`127.0.0.1:8123`)
-- **Desktop App (Tauri)**: Optional GUI with embedded server and agent binaries
-- **Python LLM Agent**: Analyzes browsing events for intent inference and context-aware assistance
+- **MCP Server**: Model Context Protocol server that exposes browsing data to Claude Desktop and other MCP clients
+- **Desktop App (Electron)**: Optional GUI for data visualization
 
 ## Quick Start
 
-### Development Mode (Recommended)
+### Recommended: Use the Dev Script
 
-Start both the Go server and desktop app together:
+The fastest way to get everything running:
 
 ```bash
 ./dev.sh
 ```
 
-This will:
-- Start the Go HTTP server on `http://127.0.0.1:51425`
-- Start the Electron desktop app
-- Handle graceful shutdown on Ctrl+C
+This starts the Go HTTP server and desktop app. Then:
 
-Press `Ctrl+C` to stop all processes.
+1. Install the browser extension (see below)
+2. Configure the MCP server for Claude Desktop (see `mcp-server/README.md`)
 
-### Manual Component Startup
+### Manual Setup
 
-If you prefer to run components separately:
-
-**Go Server:**
+**1. Start Go Server:**
 ```bash
 cd server
 go run ./cmd/browsetrace-agent
@@ -43,14 +39,7 @@ go run ./cmd/browsetrace-agent
 # GET  /stats  - Aggregated metrics
 ```
 
-**Desktop App:**
-```bash
-cd desktop
-pnpm install
-pnpm start
-```
-
-**Browser Extension:**
+**2. Install Browser Extension:**
 ```bash
 cd browser-extension
 pnpm install
@@ -60,11 +49,20 @@ pnpm build        # Production build
 # Load dist/ as unpacked extension in Chrome
 ```
 
-**Python Agent:**
+**3. (Optional) Start Desktop App for Visualization:**
 ```bash
-cd agent
-pip install -r requirements.txt
-python agent.py
+cd desktop
+pnpm install
+pnpm start
+```
+
+**4. Set up MCP Server for Claude Desktop:**
+```bash
+cd mcp-server
+pnpm install
+pnpm build
+
+# Configure Claude Desktop (see mcp-server/README.md)
 ```
 
 ## Design Principles
@@ -72,7 +70,7 @@ python agent.py
 - **Comprehensiveness**: Capture all meaningful interactions
 - **Privacy-First**: Local storage only, sensitive data masked
 - **Performance**: <5ms overhead per interaction
-- **Real-Time**: Immediate event flow for live LLM inference
+- **MCP-Native**: Expose data through Model Context Protocol for seamless LLM integration
 - **LLM-Optimized**: Event structure designed for efficient AI consumption
 
 ## Monorepo Structure
@@ -81,10 +79,9 @@ python agent.py
 browsetrace/
 ├── browser-extension/  # Chrome extension (TypeScript, React)
 ├── server/             # Go HTTP server with SQLite
-├── agent/              # Python LLM agent
-├── desktop/            # Tauri desktop app (Rust + Web UI)
-├── shared/             # Shared types and schemas
-└── scripts/            # Build and release automation
+├── mcp-server/         # MCP server for Claude Desktop integration
+├── desktop/            # Electron desktop app for data visualization
+└── scripts/            # Build and development scripts
 ```
 
 See [DESIGN.md](DESIGN.md) for detailed architecture and component documentation.
